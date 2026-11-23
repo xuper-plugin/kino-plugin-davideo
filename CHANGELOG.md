@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.0
+
+- Your plugins as cards in a grid: the icon on top, Instalar below, or Abrir and Desinstalar with a green edge when installed; an update badge; a filter (Todos, Instalados, No instalados), installed first
+- Xuper and ZappTV join the list
+
 ## 0.1.6
 
 - The list refreshes by itself: a plugin installed from here shows under Tus plugins when you come back

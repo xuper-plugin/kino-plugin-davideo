@@ -1,7 +1,7 @@
 // Da-Video's own page under the standard bar: Kino Resolver (the heart) first, then the person's plugins of xuper-plugin with
 // what each needs (an update, its setup), then the ones still to install. Everything it knows comes from Kino:
 // kino.manage.updates() (installed, versions, the update the last check found), kino.plugins.setupStatus (a plugin's setup).
-import { OWNER, RESOLVER, PLUGINS, entryOf } from "./catalog.js";
+import { OWNER, RESOLVER, PLUGINS, entryOf, iconOf } from "./catalog.js";
 
 const POLL_MS = 3_000;
 const IDLE_POLL_MS = 5_000;
@@ -56,6 +56,10 @@ export const PAGE_EVENTS = {
     return { state: statusState(await loadStatus()) };
   },
   // Kino starts every job off: the person's own tap turns the 4-hourly update on (enableJob; Kino drops it from a timer).
+  filter({ value }) {
+    const v = Array.isArray(value) ? value[0] : value;
+    return { state: { filter: FILTERS.includes(v) ? v : "all" } };
+  },
   enableAuto() {
     return { enableJob: "update", state: { jobOn: true } };
   },
@@ -109,28 +113,53 @@ const resultLine = (r) => {
   }
 };
 
+/** One card of the grid: the icon on top, the name, the version, then what can be done with it. */
 function pluginCard(entry, row, last, i) {
-  const lines = [text(`name-${i}`, entry.name, entry.name, { style: "h5" })];
-  if (row) {
-    const sub = row.available ? [`Versión ${row.version} · hay una nueva: ${row.available}`, `Version ${row.version} · a new one: ${row.available}`]
-      : [`Versión ${row.version}`, `Version ${row.version}`];
-    lines.push(text(`ver-${i}`, sub[0], sub[1], { color: row.available ? "primary" : "muted" }));
-    if (!row.enabled) lines.push(text(`off-${i}`, "Está apagado en Plugins.", "It is switched off in Plugins.", { color: "muted" }));
-    if (entry.setup && row.setupRunning) lines.push(text(`setupRun-${i}`, "Configurándose…", "Setting up…", { color: "muted" }));
-    else if (entry.setup && row.setupReady === false) lines.push(text(`setupNeed-${i}`, "Necesita configurarse.", "Needs to be set up.", { color: "error" }));
+  const installed = !!row;
+  const lines = [
+    { type: "Image", key: `icon-${i}`, url: iconOf(entry), w: 80, h: 80, radius: "large", fit: "cover",
+      fallback: { type: "Icon", key: `iconFb-${i}`, name: "movie", color: "muted" } },
+    text(`name-${i}`, entry.name, entry.name, { style: "h5", textAlign: "center", maxLines: 2 }),
+  ];
+  if (installed) {
+    lines.push(text(`ver-${i}`, `v${row.version}`, `v${row.version}`, { color: "muted", textAlign: "center" }));
+    if (row.available) {
+      lines.push({ type: "Row", key: `upd-${i}`, gap: 4, mainAxisAlignment: "center", crossAxisAlignment: "center", children: [
+        { type: "Icon", key: `updIcon-${i}`, name: "refresh", color: "primary" },
+        { type: "Badge", key: `updBadge-${i}`, text: `v${row.available}`, textEn: `v${row.available}`, color: "primary" },
+      ] });
+    }
+    if (!row.enabled) lines.push(text(`off-${i}`, "Apagado", "Switched off", { color: "muted", textAlign: "center" }));
+    if (entry.setup && row.setupRunning) lines.push(text(`setupRun-${i}`, "Configurándose…", "Setting up…", { color: "muted", textAlign: "center" }));
+    else if (entry.setup && row.setupReady === false) lines.push(text(`setupNeed-${i}`, "Necesita configurarse", "Needs setting up", { color: "error", textAlign: "center" }));
     const l = resultLine(last);
-    if (l) lines.push(text(`last-${i}`, l[0], l[1], { color: "muted" }));
+    if (l) lines.push(text(`last-${i}`, l[0], l[1], { color: "muted", textAlign: "center" }));
   }
   const buttons = [];
-  if (!row) {
+  if (!installed) {
     buttons.push({ type: "ElevatedButton", key: `install-${i}`, icon: "download", ...label("Instalar", "Install"), onPressed: { go: { installPlugin: { repo: entry.repo } } } });
   } else {
     if (row.available) buttons.push({ type: "ElevatedButton", key: `update-${i}`, icon: "refresh", ...label("Actualizar", "Update"), onPressed: { event: "updateOne", arg: entry.repo } });
     if (entry.setup && row.setupReady === false && !row.setupRunning) buttons.push({ type: "ElevatedButton", key: `setup-${i}`, icon: "settings", ...label("Configurar", "Set up"), onPressed: { event: "setupPlugin", arg: entry.repo } });
     buttons.push({ type: "TextButton", key: `open-${i}`, ...label("Abrir", "Open"), onPressed: { go: { plugin: { repo: entry.repo } } } });
+    buttons.push({ type: "TextButton", key: `uninstall-${i}`, ...label("Desinstalar", "Uninstall"), onPressed: { go: { uninstallPlugin: { repo: entry.repo } } } });
   }
-  return { type: "Card", key: `card-${i}`, children: [{ type: "Column", padding: 12, gap: 8, children: [...lines, { type: "Row", key: `actions-${i}`, gap: 8, children: buttons }] }] };
+  return {
+    type: "Card", key: `card-${i}`,
+    // Installed: a green edge (Kino's success colour), the rest none.
+    ...(installed ? { border: { width: 2, color: "success" } } : {}),
+    children: [{ type: "Column", padding: 12, gap: 8, crossAxisAlignment: "center", children: [
+      ...lines,
+      { type: "Column", key: `actions-${i}`, gap: 4, crossAxisAlignment: "stretch", children: buttons },
+    ] }],
+  };
 }
+
+/** The filter of the grid, a state of the page: all (installed first), installed, not installed. */
+const FILTERS = ["all", "installed", "missing"];
+const filterOf = (state) => (state && FILTERS.includes(state.filter) ? state.filter : "all");
+
+const grid = (key, cards) => ({ type: "GridView", key, columns: { compact: 2, medium: 3, expanded: 4 }, gap: 12, children: cards });
 
 /** The page's nodes (std's `page.view`). */
 export function pageView({ state }) {
@@ -153,22 +182,29 @@ export function pageView({ state }) {
     ] }] });
   }
   const lastOf = (repo) => (st.lastResult || []).find((r) => r && r.repo === repo);
-  // The heart first.
+  // The heart first, on its own.
   nodes.push(text("heartTitle", "El corazón", "The heart", { style: "h4" }));
   nodes.push(text("heartText", "Kino Resolver abre los servidores de casi todos tus plugins.", "Kino Resolver opens the servers of almost all your plugins.", { color: "muted" }));
-  nodes.push(pluginCard(RESOLVER, st.plugins[RESOLVER.repo], lastOf(RESOLVER.repo), 0));
-  // What the person has, then what is missing.
-  const mine = PLUGINS.filter((p) => st.plugins[p.repo]);
-  const missing = PLUGINS.filter((p) => !st.plugins[p.repo]);
-  nodes.push(text("mineTitle", "Tus plugins", "Your plugins", { style: "h4" }));
-  nodes.push(
+  nodes.push(grid("heartGrid", [pluginCard(RESOLVER, st.plugins[RESOLVER.repo], lastOf(RESOLVER.repo), 0)]));
+  // The plugins: the filter, then the grid (installed first when it shows all).
+  const filter = filterOf(state);
+  nodes.push({ type: "Row", key: "pluginsHead", gap: 8, crossAxisAlignment: "center", children: [
+    text("mineTitle", "Tus plugins", "Your plugins", { style: "h4" }),
     { type: "TextButton", key: "checkNow", icon: "refresh", ...label(st.running ? "Actualizando…" : "Buscar actualizaciones", st.running ? "Updating…" : "Check for updates"), onPressed: { event: "checkNow" } },
-  );
-  if (!mine.length) nodes.push(text("mineEmpty", "Todavía no tienes ninguno. Instala uno de abajo.", "You don't have any yet. Install one below.", { color: "muted" }));
-  mine.forEach((p, i) => nodes.push(pluginCard(p, st.plugins[p.repo], lastOf(p.repo), i + 1)));
-  if (missing.length) {
-    nodes.push(text("missingTitle", "Para instalar", "To install", { style: "h4" }));
-    missing.forEach((p, i) => nodes.push(pluginCard(p, null, null, 100 + i)));
+  ] });
+  nodes.push({ type: "Chips", key: "filter", value: filter, onChange: { event: "filter" }, options: [
+    { value: "all", label: "Todos", labelEn: "All" },
+    { value: "installed", label: "Instalados", labelEn: "Installed" },
+    { value: "missing", label: "No instalados", labelEn: "Not installed" },
+  ] });
+  const installed = PLUGINS.filter((p) => st.plugins[p.repo]);
+  const missing = PLUGINS.filter((p) => !st.plugins[p.repo]);
+  const shown = filter === "installed" ? installed : filter === "missing" ? missing : [...installed, ...missing];
+  if (!shown.length) {
+    nodes.push(text("emptyFilter", filter === "installed" ? "Todavía no tienes ninguno instalado." : "Ya los tienes todos.",
+      filter === "installed" ? "You have none installed yet." : "You have them all.", { color: "muted" }));
+  } else {
+    nodes.push(grid("pluginsGrid", shown.map((p) => pluginCard(p, st.plugins[p.repo] || null, lastOf(p.repo), 1 + PLUGINS.indexOf(p)))));
   }
   nodes.push(text("autoText", `Da-Video revisa tus plugins de ${OWNER} cada 4 horas. Cámbialo en Ajustes ▸ Plugins ▸ Da-Video.`,
     `Da-Video checks your ${OWNER} plugins every 4 hours. Change it in Settings ▸ Plugins ▸ Da-Video.`, { color: "muted" }));

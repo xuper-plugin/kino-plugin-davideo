@@ -80,6 +80,7 @@ const GO_TEXT = {
   relinkTelegram: "Kino's own «Reautenticar Telegram» screen, where the person re-validates this device with their Telegram account; only for a plugin that declares `identity` (the fix for a `kino.identity` that answered `not_available`)",
   setExperience: "asks for the light (`\"light\"`: no shadows, no effects, square corners) or the full (`\"full\"`) experience of the whole app; Kino asks the person first and changes nothing without their yes",
   installPlugin: "Kino's own install sheet for `repo` (a plain `owner/name`); nothing installs without the person's own Instalar",
+  uninstallPlugin: "Kino's own uninstall question for `repo`, a plugin your plugin manages (`manage`: the same GitHub owner and author key); nothing is uninstalled without the person's own Desinstalar there",
   plugin: `another plugin's screen at \`route\` with \`args\`, or its search for \`query\`, found by \`repo\` (a GitHub \`owner/name[/path]\`; a URL or an \`@ref\` is dropped); Kino installs it first, after the person's own yes, when it is missing`,
   useTheme: "turns on one of this plugin's own `appThemes` as Apariencia does, or with `theme: null` goes back to Kino's theme while one of its own is active; opens nothing, Kino shows its own toast and calls `screen` again",
 };
@@ -196,6 +197,7 @@ export const TABLES = {
   screenGo: () => table(["`go`", "What opens", "Sent from"], S.goShapes.map((g) => {
     if (!GO_TEXT[g]) throw new Error(`guide-tables: no description for the go shape ${g}`);
     const from = g === "relinkTelegram" ? `only the person's own ${S.goUrl.fromTriggers.join(" or ")} (a tap, a submit, the answer to one, a pop-up's button, a panel press); from apiVersion ${S.goRelinkTelegram.apiVersion}`
+      : g === "uninstallPlugin" ? `only the person's own ${S.goUrl.fromTriggers.join(" or ")} on your screen (a tap, a submit, the answer to one, a pop-up's button), never a panel; from apiVersion ${S.goUninstallPlugin.apiVersion}`
       : g === "installPlugin" || g === "plugin" ?`only the person's own ${S.goUrl.fromTriggers.join(" or ")} on your screen (a tap, a submit, the answer to one, a pop-up's button), never a panel; from apiVersion ${S[g === "plugin" ? "goPlugin" : "goInstallPlugin"].apiVersion}`
       : g === "setExperience" ? `only the person's own ${S.goUrl.fromTriggers.join(" or ")} on your screen (a tap, a submit, the answer to one, a pop-up's button), never a panel; from apiVersion ${S.goSetExperience.apiVersion}`
       : g === "useTheme" ? `only the person's own ${S.goUrl.fromTriggers.join(" or ")} on your screen (a tap, a submit, the answer to one, a pop-up's button), never a panel; from apiVersion ${S.goUseTheme.apiVersion}`

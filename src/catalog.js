@@ -27,7 +27,12 @@ export const PLUGINS = [
   { repo: "xuper-plugin/kino-plugin-sololatino", name: "SoloLatino", kind: "movies" },
   { repo: "xuper-plugin/kino-plugin-latanime", name: "TodoAnime", kind: "anime" },
   { repo: "xuper-plugin/kino-plugin-verpelis", name: "VerPelis", kind: "movies" },
+  { repo: "xuper-plugin/kino-plugin-xuper", name: "Xuper", kind: "live" },
+  { repo: "xuper-plugin/kino-plugin-zapptv", name: "ZappTV", kind: "live" },
 ];
+
+/** The icon a card shows: the plugin's own icon.png on its default branch (a public https picture needs no host). */
+export const iconOf = (entry) => `https://raw.githubusercontent.com/${entry.repo}/HEAD/icon.png`;
 
 /** The catalog entry of [repo] (any case), or null. */
 export function entryOf(repo) {

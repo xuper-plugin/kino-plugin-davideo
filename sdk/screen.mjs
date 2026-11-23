@@ -2662,6 +2662,12 @@ class Reader {
       const g = installPluginGoOf(v, (why) => this.log(`${where} go.installPlugin ${why}, dropped`));
       return g === null ? null : { installPlugin: g };
     }
+    if (k === "uninstallPlugin") {
+      const min = contract.manifest.screen.goUninstallPlugin.apiVersion;
+      if (this.apiVersion < min) return bad(`needs apiVersion ${min}`);
+      const g = installPluginGoOf(v, (why) => this.log(`${where} go.uninstallPlugin ${why}, dropped`));
+      return g === null ? null : { uninstallPlugin: g };
+    }
     if (k === "plugin") {
       const min = contract.manifest.screen.goPlugin.apiVersion;
       if (this.apiVersion < min) return bad(`needs apiVersion ${min}`);
@@ -3165,6 +3171,7 @@ export function checkPanelScreenAnswer(value, lang = "es", { allowSeries = true,
     if (a.go?.setExperience) { capped("panel: go.setExperience is honoured only on the plugin's own screen, dropped"); a.go = null; }
     // apiVersion 19: the plugin store is reached only from the plugin's own full screen, never from the player.
     if (a.go?.installPlugin) { capped("panel: go.installPlugin is honoured only on the plugin's own screen, dropped"); a.go = null; }
+    if (a.go?.uninstallPlugin) { capped("panel: go.uninstallPlugin is honoured only on the plugin's own screen, dropped"); a.go = null; }
     if (a.go?.plugin) { capped("panel: go.plugin is honoured only on the plugin's own screen, dropped"); a.go = null; }
     let panel = null;
     const p = opt(v, "panel");
