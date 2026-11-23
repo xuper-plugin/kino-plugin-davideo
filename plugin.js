@@ -945,7 +945,7 @@ function pluginCard(entry, row, last, i, { heart = false } = {}) {
 }
 var FILTERS = ["all", "installed", "missing"];
 var filterOf = (state) => state && FILTERS.includes(state.filter) ? state.filter : "all";
-var grid = (key, cards) => ({ type: "GridView", key, columns: { compact: 3, medium: 4, expanded: 6 }, gap: 8, children: cards });
+var grid = (key, cards) => ({ type: "GridView", key, columns: { compact: 2, medium: 3, expanded: 4 }, gap: 8, children: cards });
 function pageView({ state }) {
   const st = state && state.mp;
   const nodes = [];
@@ -974,9 +974,8 @@ function pageView({ state }) {
     maxLength: 200,
     hintText: "Buscar película o serie",
     hintTextEn: "Search a movie or a series",
-    leadingIcon: "search",
     onSubmitted: "search",
-    trailingIcon: "arrow_forward",
+    trailingIcon: "search",
     trailingLabel: "Buscar",
     trailingLabelEn: "Search",
     onTrailingTap: "search"

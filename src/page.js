@@ -162,7 +162,7 @@ function pluginCard(entry, row, last, i, { heart = false } = {}) {
 const FILTERS = ["all", "installed", "missing"];
 const filterOf = (state) => (state && FILTERS.includes(state.filter) ? state.filter : "all");
 
-const grid = (key, cards) => ({ type: "GridView", key, columns: { compact: 3, medium: 4, expanded: 6 }, gap: 8, children: cards });
+const grid = (key, cards) => ({ type: "GridView", key, columns: { compact: 2, medium: 3, expanded: 4 }, gap: 8, children: cards });
 
 /** The page's nodes (std's `page.view`). */
 export function pageView({ state }) {
@@ -186,7 +186,7 @@ export function pageView({ state }) {
   }
   // The search, Google-like, on top of the grid: it asks every one of your plugins (std's searchHere).
   nodes.unshift({ type: "TextField", key: "dvSearch", kind: "search", maxLength: 200, hintText: "Buscar película o serie", hintTextEn: "Search a movie or a series",
-    leadingIcon: "search", onSubmitted: "search", trailingIcon: "arrow_forward", trailingLabel: "Buscar", trailingLabelEn: "Search", onTrailingTap: "search" });
+    onSubmitted: "search", trailingIcon: "search", trailingLabel: "Buscar", trailingLabelEn: "Search", onTrailingTap: "search" });
   const lastOf = (repo) => (st.lastResult || []).find((r) => r && r.repo === repo);
   // The plugins: the filter, then the grid (installed first when it shows all).
   const filter = filterOf(state);

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.2
+
+- Two cards per row on a phone; the search field's button is a search icon
+
 ## 0.2.1
 
 - Compact cards: a tap opens the plugin, icon-only buttons (uninstall left, open right, download, update); Kino Resolver is one more card
