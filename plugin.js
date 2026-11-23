@@ -808,7 +808,7 @@ function pickForInstalled(shared, installed) {
     }
     if (items.length >= MIN_PER_CATEGORY) rails.push({ id: r.id, title: r.title, titleEn: r.titleEn, items });
   }
-  const drawn = [...new Map(rails.flatMap((r) => r.items).map((c) => [c.id, c])).values()].filter((c) => /^https:\/\//.test(c.backdrop || ""));
+  const drawn = [...new Map(rails.flatMap((r) => r.items).map((c) => [c.id, c])).values()].filter((c) => c.featured === true && /^https:\/\//.test(c.backdrop || ""));
   drawn.sort((a, b) => (b.overview ? 1 : 0) - (a.overview ? 1 : 0));
   const slides = [];
   const used = /* @__PURE__ */ new Set();
@@ -820,7 +820,7 @@ function pickForInstalled(shared, installed) {
       slides.push(c);
     }
   }
-  return { slides, rails: rails.map((r) => ({ ...r, items: r.items.map(({ backdrop, overview, ...rest }) => rest) })) };
+  return { slides, rails: rails.map((r) => ({ ...r, items: r.items.map(({ backdrop, overview, featured, ...rest }) => rest) })) };
 }
 function contentPlugins(st) {
   return PLUGINS.filter((p) => p.snapshot === true && st && st.plugins && st.plugins[p.repo]);

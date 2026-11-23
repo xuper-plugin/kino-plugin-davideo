@@ -67,6 +67,7 @@ export function categoryOf(row, pluginKind) {
  * SHARED_PER_CATEGORY (the device keeps the ones whose plugin the person installed). Pure.
  */
 export const SHARED_PER_CATEGORY = 60;
+export const FEATURED_PER_PLUGIN = 4;
 export function buildShared(sources, now = Date.now()) {
   const chosen = new Map();
   const cardOf = (item, src) => {
@@ -115,10 +116,21 @@ export function buildShared(sources, now = Date.now()) {
     }
     if (out.length === 0) continue;
     const cat = CATEGORIES.find((c) => c.id === id) || MORE;
-    // A synopsis only where the card can be a slide (it has a backdrop), cut short: the file stays small.
-    rails.push({ id, title: cat.es, titleEn: cat.en, items: out.map(({ key, overview, ...rest }) => (rest.backdrop && overview ? { ...rest, overview: overview.slice(0, 160) } : rest)) });
+    rails.push({ id, title: cat.es, titleEn: cat.en, items: out });
   }
-  return { v: 1, at: now, rails };
+  // The slider's candidates (featured): cards with a backdrop and a synopsis, FEATURED_PER_PLUGIN per plugin in turn (the device
+  // keeps the ones it can open). Only they keep the backdrop and the synopsis: Kino's title page takes the description from
+  // TMDB (the card's ids), and a rail draws posters. The file stays small.
+  const featured = new Set();
+  const perPlugin = new Map();
+  for (const r of rails) for (const c of r.items) {
+    const o = c.copies[0].origin;
+    if (!c.backdrop || !c.overview || featured.has(c.key) || (perPlugin.get(o) || 0) >= FEATURED_PER_PLUGIN) continue;
+    featured.add(c.key);
+    perPlugin.set(o, (perPlugin.get(o) || 0) + 1);
+  }
+  const slim = ({ key, backdrop, overview, ...rest }) => (featured.has(key) ? { ...rest, featured: true, backdrop, overview: overview.slice(0, 160) } : rest);
+  return { v: 1, at: now, rails: rails.map((r) => ({ ...r, items: r.items.map(slim) })) };
 }
 
 /**
@@ -140,7 +152,7 @@ export function pickForInstalled(shared, installed) {
     }
     if (items.length >= MIN_PER_CATEGORY) rails.push({ id: r.id, title: r.title, titleEn: r.titleEn, items });
   }
-  const drawn = [...new Map(rails.flatMap((r) => r.items).map((c) => [c.id, c])).values()].filter((c) => /^https:\/\//.test(c.backdrop || ""));
+  const drawn = [...new Map(rails.flatMap((r) => r.items).map((c) => [c.id, c])).values()].filter((c) => c.featured === true && /^https:\/\//.test(c.backdrop || ""));
   drawn.sort((a, b) => (b.overview ? 1 : 0) - (a.overview ? 1 : 0));
   const slides = [];
   const used = new Set();
@@ -152,7 +164,7 @@ export function pickForInstalled(shared, installed) {
       slides.push(c);
     }
   }
-  return { slides, rails: rails.map((r) => ({ ...r, items: r.items.map(({ backdrop, overview, ...rest }) => rest) })) };
+  return { slides, rails: rails.map((r) => ({ ...r, items: r.items.map(({ backdrop, overview, featured, ...rest }) => rest) })) };
 }
 
 /** buildShared then pickForInstalled with every source installed (the tests and the Action's summary). Pure. */

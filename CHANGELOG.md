@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.2
+
+- The shared Home keeps a backdrop and a synopsis only on the slider's candidates (4 per plugin): the title page takes the description from TMDB. About 93 KB on the wire.
+
 ## 0.4.1
 
 - Contenido opens from one shared file: this repository's Action merges every plugin's ready Home into home/content.json every 6 hours; the device makes one request and keeps the titles of the plugins you installed.
