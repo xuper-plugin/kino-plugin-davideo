@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.7
+
+- After Desinstalar the plugin's sheet closes by itself and says «Se desinstaló …».
+
 ## 0.4.6
 
 - The update pass's line («Ya revisamos hace poco…») shows on Mis plugins only, under the tabs, and goes when you switch tab.

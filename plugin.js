@@ -827,6 +827,11 @@ var PLUGINS = [
   { repo: "xuper-plugin/kino-plugin-verpelis", name: "VerPelis", kind: "movies", needsResolver: true, snapshot: true }
 ];
 var iconOf = (entry) => `https://raw.githubusercontent.com/${entry.repo}/HEAD/icon.png`;
+function entryOf(repo) {
+  const key = String(repo || "").toLowerCase();
+  if (key === RESOLVER.repo) return RESOLVER;
+  return PLUGINS.find((p) => p.repo === key) || null;
+}
 
 // src/content.js
 var k = () => globalThis.kino;
@@ -1015,8 +1020,17 @@ var PAGE_EVENTS = {
     }
     return { state: { contentLoading: false, contentAt: Date.now() } };
   },
-  async refresh() {
-    return { state: statusState(await loadStatus()) };
+  async refresh({ state } = {}) {
+    const st = await loadStatus();
+    const out = { state: statusState(st) };
+    const pick = state && state.pick;
+    if (pick && st.ok && !st.plugins[pick]) {
+      const e = entryOf(pick);
+      const name = e && e.name || pick;
+      out.state = { ...out.state, pick: null, dvTab: "mine", notice: [`Se desinstaló ${name}.`, `${name} was uninstalled.`] };
+      out.ui = [{ close: "pluginSheet" }];
+    }
+    return out;
   },
   // Kino starts every job off: the person's own tap turns the 4-hourly update on (enableJob; Kino drops it from a timer).
   pick({ arg }) {
@@ -1213,7 +1227,7 @@ function pageView({ state }) {
   ));
   return [{ type: "Column", key: "dvPage", crossAxisAlignment: "stretch", padding: { compact: 16, expanded: 24 }, gap: 16, children: nodes }];
 }
-var pageEvery = ({ state }) => state && state.contentLoading ? { ms: 1e3, event: "contentLoad" } : { ms: state && state.busy ? POLL_MS2 : IDLE_POLL_MS, event: "refresh" };
+var pageEvery = ({ state }) => state && state.contentLoading ? { ms: 1e3, event: "contentLoad" } : { ms: state && (state.busy || state.pick) ? POLL_MS2 : IDLE_POLL_MS, event: "refresh" };
 
 // src/plugin.js
 var MINE = "mine";

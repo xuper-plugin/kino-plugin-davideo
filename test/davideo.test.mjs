@@ -295,3 +295,27 @@ test("the update pass's line shows on Mis plugins only, under the tabs, and goes
   assert.ok(all.indexOf("notice") > all.indexOf("dvTabs"), "under the tabs");
   assert.equal((await p.screenEvent({ name: "dvTab", value: "content", state: o.state })).state.notice, null);
 });
+
+test("after Desinstalar the sheet closes by itself and says so", async () => {
+  let installed = true;
+  const kino = fakeKino();
+  const base = kino.manage.updates;
+  kino.manage.updates = async () => {
+    const u = await base();
+    return { ...u, plugins: u.plugins.filter((x) => installed || x.repo !== SERIESFLIX) };
+  };
+  const p = await load(kino);
+  const o = await p.screenEvent({ name: "open", state: {}, device: "phone", route: { name: "main" } });
+  const pk = await p.screenEvent({ name: "pick", arg: SERIESFLIX, state: { ...o.state, dvTab: "mine" } });
+  const st = { ...o.state, dvTab: "mine", ...pk.state };
+  const open = await p.screen({ state: st, device: "phone", installed: {} });
+  assert.equal(open.every.ms, 3000, "an open sheet polls sooner");
+  installed = false; // Kino uninstalled it
+  const r = await p.screenEvent({ name: "refresh", state: st });
+  assert.deepEqual(r.ui, [{ close: "pluginSheet" }]);
+  assert.equal(r.state.pick, null);
+  assert.match(r.state.notice[0], /Se desinstaló Seriesflix/);
+  // Still installed: the sheet stays.
+  installed = true;
+  assert.ok(!(await p.screenEvent({ name: "refresh", state: st })).ui);
+});

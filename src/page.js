@@ -81,8 +81,18 @@ export const PAGE_EVENTS = {
     if (plugins.length) { try { await loadContent(plugins); } catch (_) { /* the kept Home stays */ } }
     return { state: { contentLoading: false, contentAt: Date.now() } };
   },
-  async refresh() {
-    return { state: statusState(await loadStatus()) };
+  async refresh({ state } = {}) {
+    const st = await loadStatus();
+    const out = { state: statusState(st) };
+    // The plugin of the open sheet is gone (its Desinstalar went through Kino): the sheet closes and says so.
+    const pick = state && state.pick;
+    if (pick && st.ok && !st.plugins[pick]) {
+      const e = entryOf(pick);
+      const name = (e && e.name) || pick;
+      out.state = { ...out.state, pick: null, dvTab: "mine", notice: [`Se desinstaló ${name}.`, `${name} was uninstalled.`] };
+      out.ui = [{ close: "pluginSheet" }];
+    }
+    return out;
   },
   // Kino starts every job off: the person's own tap turns the 4-hourly update on (enableJob; Kino drops it from a timer).
   pick({ arg }) {
@@ -275,6 +285,6 @@ export function pageView({ state }) {
 // opens over this one) shows under «Tus plugins» once the person is back. Cheap: kino.manage.updates() never leaves the device.
 export const pageEvery = ({ state }) => (state && state.contentLoading
   ? { ms: 1000, event: "contentLoad" } // the Contenido Home is fetched right after the tab is drawn
-  : { ms: state && state.busy ? POLL_MS : IDLE_POLL_MS, event: "refresh" });
+  : { ms: state && (state.busy || state.pick) ? POLL_MS : IDLE_POLL_MS, event: "refresh" }); // an open sheet: sooner, so it closes after an uninstall
 
 export { entryOf };
