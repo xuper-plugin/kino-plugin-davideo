@@ -5,7 +5,7 @@
 // date (kino.manage, every 4 hours by default; the person picks 4, 5 or 6 in Kino's own row of the job).
 import { makeStandardScreen } from "./std/index.js";
 import { LOGO, LOGO_ASPECT } from "./logo.js";
-import { loadStatus, pageView, pageEvery, PAGE_EVENTS, jobIsOn } from "./page.js";
+import { loadStatus, pageView, pageEvery, PAGE_EVENTS, jobIsOn, contentWanted } from "./page.js";
 
 /** The consumes entry by author (kino-plugin.json): every installed xuper-plugin plugin that opens the catalog door. */
 const MINE = "mine";
@@ -30,7 +30,8 @@ const standard = () => (std ??= makeStandardScreen({
   page: {
     open: async () => {
       const mp = await loadStatus();
-      return { mp, jobOn: jobIsOn(), busy: mp.running, notice: null };
+      // The Contenido Home is fetched behind the first drawing (the page's timer) when nothing fresh is kept.
+      return { mp, jobOn: jobIsOn(), busy: mp.running, notice: null, contentLoading: contentWanted(mp) };
     },
     view: pageView,
     every: pageEvery,

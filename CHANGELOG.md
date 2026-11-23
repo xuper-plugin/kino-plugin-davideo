@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.0
+
+- Contenido: a second tab, shown once one of your plugins with a ready Home is installed: a slider and rows by category (new releases, popular, series, anime, dramas, kids, genres) from the ready copies of your installed plugins, one card per title; each card opens and plays in its own plugin.
+
 ## 0.3.5
 
 - A plugin that needs Kino Resolver, while the resolver is missing: its sheet says so and offers Instalar resolver instead of Abrir.

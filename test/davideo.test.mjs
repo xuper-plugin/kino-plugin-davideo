@@ -97,7 +97,12 @@ test("the page (design C): home-screen icons, yours then the ones to install, Ed
   // The job is off: the one-tap card.
   assert.deepEqual(byKey(tree, "enableAuto").onPressed, { event: "enableAuto" });
   assert.deepEqual(await p.screenEvent({ name: "enableAuto", state: o.state }), { enableJob: "update", state: { jobOn: true } });
-  assert.deepEqual(tree.every, { ms: 5000, event: "refresh" }, "a slow refresh while idle");
+  // Seriesflix keeps a ready Home: the Contenido Home is fetched right after the first drawing, then the slow refresh.
+  assert.equal(o.state.contentLoading, true);
+  assert.deepEqual(tree.every, { ms: 1000, event: "contentLoad" });
+  const after = await p.screenEvent({ name: "contentLoad", state: o.state });
+  const idle = await p.screen({ state: { ...o.state, ...after.state }, device: "phone", installed: {} });
+  assert.deepEqual(idle.every, { ms: 5000, event: "refresh" }, "a slow refresh while idle");
   for (const lang of ["es", "en"]) for (const device of ["phone", "tv"]) for (const t of [tree, te]) {
     assert.deepEqual(kit.checkScreenTree(fold(t), lang, undefined, { apiVersion: 31 }).dropped, [], `${device}/${lang}`);
   }
@@ -162,4 +167,79 @@ test("the sheet of a plugin that needs the resolver, while the resolver is missi
   const ta = await p.screen({ state: { ...o.state, ...pa.state }, device: "phone", installed: {} });
   assert.equal(byKey(ta, "sheetOpen").labelText, "Abrir");
   assert.ok(!byKey(ta, "sheetResolverNote"));
+});
+
+// ---- Contenido ----
+import { buildContent, categoryOf, MAX_SLIDES } from "../src/content.js";
+
+const card = (n, extra = {}) => ({ id: "i" + n, ref: "r:" + n, title: "Title " + n, kind: "movie", poster: "https://p/" + n + ".jpg", ...extra });
+
+test("Contenido: rows sorted into categories, one card per title (the first plugin keeps it), cards carry their origin", () => {
+  const A = "xuper-plugin/kino-plugin-serieskao", B = "xuper-plugin/kino-plugin-cinehdplus";
+  const home = buildContent([
+    { repo: A, kind: "series", rows: [
+      { id: "s", title: "Destacados", hidden: true, items: [card(1, { backdrop: "https://b/1.jpg", overview: "Uno" })] },
+      { id: "r", title: "Películas recientes", items: [card(1), card(2), card(3), card(4)] },
+      { id: "a", title: "Acción", items: [card(5), card(6), card(7), card(8)] },
+    ] },
+    { repo: B, kind: "movies", rows: [
+      { id: "n", title: "Estrenos", items: [card(1, { title: "TITLE 1", backdrop: "https://b/1b.jpg" }), card(9), card(10), card(11)] },
+      { id: "x", title: "Anime", items: [card(12)] },
+    ] },
+  ]);
+  assert.deepEqual(home.rails.map((r) => r.id), ["estrenos", "accion"], "Anime has under 4 cards: left out");
+  const est = home.rails[0].items;
+  assert.equal(est.filter((c) => c.title.toLowerCase() === "title 1").length, 1, "one card for the same title");
+  assert.equal(est.find((c) => c.ref === "r:1").origin, A, "the first plugin keeps it");
+  assert.ok(est.every((c) => c.origin && !c.backdrop), "rails: posters only, every card with its origin");
+  // The slide is a drawn card (same id as in its rail), with the backdrop another plugin's copy lent it.
+  assert.equal(home.slides.length, 1);
+  assert.ok(est.some((c) => c.id === home.slides[0].id));
+  assert.ok(home.slides.length <= MAX_SLIDES);
+});
+
+test("Contenido: a row's category by its title, else its plugin's kind", () => {
+  assert.equal(categoryOf({ title: "K-Drama", items: [] }, "series"), "doramas");
+  assert.equal(categoryOf({ title: "Series de drama", items: [] }, "movies"), "drama");
+  assert.equal(categoryOf({ title: "Nickelodeon", items: [] }, "kids"), "infantil");
+  assert.equal(categoryOf({ title: "Inicio", items: [] }, "anime"), "anime");
+  assert.equal(categoryOf({ title: "Tendencias en películas", items: [] }, "movies"), "populares");
+  assert.equal(categoryOf({ title: "Cosas", items: [card(1)] }, "movies"), "mas");
+});
+
+test("Contenido: the tab shows once a plugin with a ready Home is installed, built from the repositories' files", async () => {
+  const now = Date.now();
+  const files = {
+    "xuper-plugin/kino-plugin-seriesflix/main/home/index.json": { v: 1, tabs: [{ id: "series" }] },
+    "xuper-plugin/kino-plugin-seriesflix/main/home/series.json": { v: 1, tab: "series", at: now, rows: [
+      { id: "p", title: "Series populares", items: [card(1, { kind: "series", backdrop: "https://b/1.jpg", overview: "x" }), card(2, { kind: "series" }), card(3, { kind: "series" }), card(4, { kind: "series" })] },
+    ] },
+  };
+  const kino = fakeKino();
+  kino.fetch = async (url) => {
+    const f = files[String(url).replace("https://raw.githubusercontent.com/", "")];
+    return f ? { ok: true, text: async () => JSON.stringify(f) } : { ok: false, status: 404, text: async () => "" };
+  };
+  const p = await load(kino);
+  const o = await p.screenEvent({ name: "open", state: {}, device: "phone", route: { name: "main" } });
+  const mine = await p.screen({ state: o.state, device: "phone", installed: {} });
+  assert.equal(byKey(mine, "dvTabs").value, "mine");
+  await p.screenEvent({ name: "contentLoad", state: o.state });
+  const sw = await p.screenEvent({ name: "dvTab", value: "content", state: o.state });
+  const t = await p.screen({ state: { ...o.state, ...sw.state }, device: "phone", installed: {} });
+  const rail = byKey(t, "dvrail-series");
+  assert.equal(rail.items.length, 4);
+  assert.equal(rail.items[0].origin, "xuper-plugin/kino-plugin-seriesflix");
+  assert.ok(byKey(t, "dvslide-" + rail.items[0].id), "the slide is the rail's card");
+  assert.ok(!byKey(t, "mineGrid"), "Contenido replaces the plugins grid");
+  assert.deepEqual(kit.checkScreenTree(fold(t), "es", undefined, { apiVersion: 31 }).dropped, []);
+});
+
+test("Contenido: no tabs while no plugin with a ready Home is installed", async () => {
+  const kino = fakeKino({ updates: { plugins: [{ repo: RESOLVER, id: "kino-resolver", name: "Kino Resolver", version: "0.0.29", available: null, enabled: true }], running: false, lastRun: null, lastResult: [] } });
+  const p = await load(kino);
+  const o = await p.screenEvent({ name: "open", state: {}, device: "phone", route: { name: "main" } });
+  const t = await p.screen({ state: o.state, device: "phone", installed: {} });
+  assert.ok(!byKey(t, "dvTabs"));
+  assert.ok(!o.state.contentLoading);
 });

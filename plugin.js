@@ -67,7 +67,7 @@ function recentOf(keys, tabs) {
       for (const card of rail2.items) {
         const ks = [card.ref];
         if (card.ids && card.ids.tmdb) ks.push(`t:${card.ids.tmdb}`);
-        for (const k2 of ks) if (!byKey.has(k2)) byKey.set(k2, card);
+        for (const k3 of ks) if (!byKey.has(k3)) byKey.set(k3, card);
       }
     }
   }
@@ -110,10 +110,10 @@ var WORDS = {
   ],
   gateInstall: ["Instalar Kino Resolver", "Install Kino Resolver"]
 };
-var fill = (s, vars) => s.replace(/\{(\w+)\}/g, (m, k2) => vars && vars[k2] != null ? String(vars[k2]) : m);
+var fill = (s, vars) => s.replace(/\{(\w+)\}/g, (m, k3) => vars && vars[k3] != null ? String(vars[k3]) : m);
 function twin(key, field = "text", vars) {
   const [es, en] = WORDS[key];
-  const pick = (i) => vars && Object.fromEntries(Object.entries(vars).map(([k2, v]) => [k2, Array.isArray(v) ? v[i] : v]));
+  const pick = (i) => vars && Object.fromEntries(Object.entries(vars).map(([k3, v]) => [k3, Array.isArray(v) ? v[i] : v]));
   return { [field]: fill(es, pick(0)), [field + "En"]: fill(en, pick(1)) };
 }
 var STRING_KEYS = Object.keys(WORDS);
@@ -328,7 +328,7 @@ var MAX = 160;
 var CONCURRENCY = 3;
 var OVERVIEW_MAX = 160;
 var HTTPS2 = /^https:\/\//;
-function makeMetaCache({ kino, titleOf: titleOf2 = (c) => c.title, typeOf = (c) => c.kind === "series" ? "series" : "movie", tmdbPictures = false, clock = { now: () => Date.now() } }) {
+function makeMetaCache({ kino, titleOf: titleOf3 = (c) => c.title, typeOf = (c) => c.kind === "series" ? "series" : "movie", tmdbPictures = false, clock = { now: () => Date.now() } }) {
   const usable = () => {
     try {
       return typeof kino.meta === "function" && kino.meta.byTitle === true;
@@ -369,10 +369,10 @@ function makeMetaCache({ kino, titleOf: titleOf2 = (c) => c.title, typeOf = (c) 
   const asked = (id) => Object.hasOwn(read(), id);
   function dress(cards) {
     return cards.map((c) => {
-      const k2 = known(c.id);
-      const poster = tmdbPictures && k2.poster ? k2.poster : null;
-      if (!k2.tmdb && !poster) return c;
-      return { ...c, ...k2.tmdb && !(c.ids && c.ids.tmdb) ? { ids: { ...c.ids || {}, tmdb: k2.tmdb } } : {}, ...poster ? { poster } : {} };
+      const k3 = known(c.id);
+      const poster = tmdbPictures && k3.poster ? k3.poster : null;
+      if (!k3.tmdb && !poster) return c;
+      return { ...c, ...k3.tmdb && !(c.ids && c.ids.tmdb) ? { ids: { ...c.ids || {}, tmdb: k3.tmdb } } : {}, ...poster ? { poster } : {} };
     });
   }
   async function fill2(cards, budgetMs) {
@@ -394,7 +394,7 @@ function makeMetaCache({ kino, titleOf: titleOf2 = (c) => c.title, typeOf = (c) 
         const c = todo[next++];
         const year = c.year !== void 0 ? { year: c.year } : {};
         try {
-          const a = await kino.meta({ type: typeOf(c), title: titleOf2(c), ...year });
+          const a = await kino.meta({ type: typeOf(c), title: titleOf3(c), ...year });
           b[c.id] = {
             t: a && a.ids && Number.isInteger(a.ids.tmdb) ? a.ids.tmdb : 0,
             l: str(a && a.logo, 2048),
@@ -430,18 +430,18 @@ var INFLIGHT_KEY = "std:inflight";
 var INFLIGHT_STALE_MS = 18e3;
 var MAX_META_TICKS = 10;
 var DEFAULT_TABS = [{ id: "inicio", label: "Inicio", labelEn: "Home" }];
-function makeStandardScreen({ kino, name, nameEn, logo = null, logoAspect = "1:1", needsResolver, hasSettings, tabs, loadTab, homeKey = null, titleOf: titleOf2, typeOf, tmdbPictures = false, imageHeaders = null, searchHere = null, page = null, barSearch = true, backArrow = true }) {
+function makeStandardScreen({ kino, name, nameEn, logo = null, logoAspect = "1:1", needsResolver, hasSettings, tabs, loadTab, homeKey = null, titleOf: titleOf3, typeOf, tmdbPictures = false, imageHeaders = null, searchHere = null, page = null, barSearch = true, backArrow = true }) {
   const cfg = { name, nameEn, logo, logoAspect, imageHeaders, hasSettings: !!hasSettings, barSearch: barSearch !== false, backArrow: backArrow !== false, tabs: Array.isArray(tabs) && tabs.length > 0 ? tabs : DEFAULT_TABS };
   const TAB_IDS = cfg.tabs.map((t) => t.id);
-  const meta = makeMetaCache({ kino, titleOf: titleOf2, typeOf, tmdbPictures });
+  const meta = makeMetaCache({ kino, titleOf: titleOf3, typeOf, tmdbPictures });
   function slidesFromMeta(rails) {
     const out = [];
     for (const r of rails) {
       for (const c of r.items) {
         if (out.length >= MAX_SLIDES) return out;
-        const k2 = meta.known(c.id);
-        if (!k2.backdrop || c.adult === true || out.some((x) => x.id === c.id)) continue;
-        out.push({ id: c.id, ref: c.ref, kind: c.kind, title: c.title, image: k2.backdrop, text: slideText(k2.overview, c), ...k2.logo ? { logo: k2.logo } : {} });
+        const k3 = meta.known(c.id);
+        if (!k3.backdrop || c.adult === true || out.some((x) => x.id === c.id)) continue;
+        out.push({ id: c.id, ref: c.ref, kind: c.kind, title: c.title, image: k3.backdrop, text: slideText(k3.overview, c), ...k3.logo ? { logo: k3.logo } : {} });
       }
     }
     return out;
@@ -449,9 +449,9 @@ function makeStandardScreen({ kino, name, nameEn, logo = null, logoAspect = "1:1
   const enrich = (data) => {
     if (!data) return data;
     const own = data.slides.map((s) => {
-      const k2 = meta.known(s.id);
-      const image = tmdbPictures && k2.backdrop ? k2.backdrop : null;
-      return k2.logo || image ? { ...s, ...k2.logo ? { logo: k2.logo } : {}, ...image ? { image } : {} } : s;
+      const k3 = meta.known(s.id);
+      const image = tmdbPictures && k3.backdrop ? k3.backdrop : null;
+      return k3.logo || image ? { ...s, ...k3.logo ? { logo: k3.logo } : {}, ...image ? { image } : {} } : s;
     });
     const learned = own.length > 0 ? [] : slidesFromMeta(data.rails);
     return {
@@ -467,23 +467,23 @@ function makeStandardScreen({ kino, name, nameEn, logo = null, logoAspect = "1:1
     ok: !!(a && a.ok),
     items: a && a.ok && Array.isArray(a.items) ? a.items.filter((x) => x && x.id && x.ref && x.title).slice(0, 40).map((x) => ({ ...x, id: ("p" + index + "~" + x.id).slice(0, 128), origin: a.repo })) : []
   });
-  const memo = /* @__PURE__ */ new Map();
+  const memo2 = /* @__PURE__ */ new Map();
   const log = (...a) => {
     try {
       kino.log("[std]", ...a);
     } catch (_) {
     }
   };
-  const get = (k2) => {
+  const get = (k3) => {
     try {
-      return kino.storage.get(k2);
+      return kino.storage.get(k3);
     } catch (_) {
       return null;
     }
   };
-  const set = (k2, v, opts) => {
+  const set = (k3, v, opts) => {
     try {
-      kino.storage.set(k2, v, opts);
+      kino.storage.set(k3, v, opts);
     } catch (_) {
     }
   };
@@ -520,10 +520,10 @@ function makeStandardScreen({ kino, name, nameEn, logo = null, logoAspect = "1:1
     return TAB_IDS.includes(t) ? t : null;
   };
   function dataOf(tab) {
-    if (memo.has(tab)) return memo.get(tab).data;
+    if (memo2.has(tab)) return memo2.get(tab).data;
     const snap = readSnap(tab) || homeSeed(tab);
     if (snap) {
-      memo.set(tab, { data: snap, whole: false });
+      memo2.set(tab, { data: snap, whole: false });
       return snap;
     }
     return null;
@@ -531,7 +531,7 @@ function makeStandardScreen({ kino, name, nameEn, logo = null, logoAspect = "1:1
   const readKeys = () => {
     try {
       const a = JSON.parse(get(RECENT_KEY) || "[]");
-      return Array.isArray(a) ? a.filter((k2) => typeof k2 === "string") : [];
+      return Array.isArray(a) ? a.filter((k3) => typeof k3 === "string") : [];
     } catch (_) {
       return [];
     }
@@ -542,7 +542,7 @@ function makeStandardScreen({ kino, name, nameEn, logo = null, logoAspect = "1:1
       if (key === "" || key.startsWith("x|")) return;
       const keys = readKeys();
       if (keys[0] === key) return;
-      set(RECENT_KEY, JSON.stringify([key, ...keys.filter((k2) => k2 !== key)].slice(0, RECENT_MAX)));
+      set(RECENT_KEY, JSON.stringify([key, ...keys.filter((k3) => k3 !== key)].slice(0, RECENT_MAX)));
     } catch (_) {
     }
   }
@@ -551,7 +551,7 @@ function makeStandardScreen({ kino, name, nameEn, logo = null, logoAspect = "1:1
     return TAB_IDS.includes(a.tab) ? a.tab : null;
   };
   function needed(tab) {
-    return memo.get(tab) && memo.get(tab).whole ? [] : [tab];
+    return memo2.get(tab) && memo2.get(tab).whole ? [] : [tab];
   }
   function screen2(ctx) {
     const c = ctx || {};
@@ -572,7 +572,7 @@ function makeStandardScreen({ kino, name, nameEn, logo = null, logoAspect = "1:1
     const st = c.state && typeof c.state === "object" ? c.state : {};
     const tab = TAB_IDS.includes(st.tab) ? st.tab : tabFromArgs(c.route) ?? stored() ?? TAB_IDS[0];
     const data = enrich(dataOf(tab));
-    const loaded = TAB_IDS.map((t) => memo.get(t)).filter(Boolean).map((m) => m.data);
+    const loaded = TAB_IDS.map((t) => memo2.get(t)).filter(Boolean).map((m) => m.data);
     const pending = Array.isArray(st.pending) && st.pending.length > 0;
     const searching = st.searching === true;
     if (page) {
@@ -606,7 +606,7 @@ function makeStandardScreen({ kino, name, nameEn, logo = null, logoAspect = "1:1
     }
     const data = tabOf(page2);
     if (data) {
-      memo.set(tab, { data, whole: true });
+      memo2.set(tab, { data, whole: true });
       writeSnap(tab, data);
     }
     return data !== null;
@@ -637,7 +637,7 @@ function makeStandardScreen({ kino, name, nameEn, logo = null, logoAspect = "1:1
       const failed = { ...state.failed || {} };
       delete failed[tab];
       const pending = [tab, ...Array.isArray(state.pending) ? state.pending.filter((t) => t !== tab) : []];
-      return { state: { tab, pending: memo.get(tab) && memo.get(tab).whole ? pending.slice(1) : pending, failed } };
+      return { state: { tab, pending: memo2.get(tab) && memo2.get(tab).whole ? pending.slice(1) : pending, failed } };
     },
     retry({ state }) {
       const tab = TAB_IDS.includes(state.tab) ? state.tab : TAB_IDS[0];
@@ -668,7 +668,7 @@ function makeStandardScreen({ kino, name, nameEn, logo = null, logoAspect = "1:1
       const failed = { ...state.failed || {} };
       if (next.startsWith("meta:")) {
         const tab = next.slice(5);
-        const m = memo.get(tab);
+        const m = memo2.get(tab);
         if (!m) return { state: { pending: rest } };
         const ask = (x) => ({ id: x.id, title: x.title, kind: x.kind, ...x.year !== void 0 ? { year: x.year } : {} });
         const noOwnSlides = m.data.slides.length === 0;
@@ -764,36 +764,259 @@ var PLUGINS = [
   { repo: "xuper-plugin/kino-plugin-zapptv", name: "ZappTV", kind: "live" },
   { repo: "xuper-plugin/kino-plugin-hdfull", name: "HDFull", kind: "movies", needsResolver: true },
   { repo: "xuper-plugin/kino-plugin-animes-es", name: "AnimES", kind: "anime" },
-  { repo: "xuper-plugin/kino-plugin-cinehdplus", name: "CineHD Plus", kind: "movies", needsResolver: true },
-  { repo: "xuper-plugin/kino-plugin-cinemitas", name: "Cinemitas", kind: "movies", needsResolver: true },
-  { repo: "xuper-plugin/kino-plugin-cuevanapro", name: "Cuevana Pro", kind: "movies", needsResolver: true },
-  { repo: "xuper-plugin/kino-plugin-doramasyt", name: "DoramasYT", kind: "series", needsResolver: true },
-  { repo: "xuper-plugin/kino-plugin-embed69", name: "Embed 69", kind: "movies", needsResolver: true },
-  { repo: "xuper-plugin/kino-plugin-lacartoons", name: "LA Cartoons Plus", kind: "kids", needsResolver: true },
-  { repo: "xuper-plugin/kino-plugin-latino", name: "Latino", kind: "movies", needsResolver: true },
-  { repo: "xuper-plugin/kino-plugin-mundodonghua", name: "MundoDonghua", kind: "anime", needsResolver: true },
+  { repo: "xuper-plugin/kino-plugin-cinehdplus", name: "CineHD Plus", kind: "movies", needsResolver: true, snapshot: true },
+  { repo: "xuper-plugin/kino-plugin-cinemitas", name: "Cinemitas", kind: "movies", needsResolver: true, snapshot: true },
+  { repo: "xuper-plugin/kino-plugin-cuevanapro", name: "Cuevana Pro", kind: "movies", needsResolver: true, snapshot: true },
+  { repo: "xuper-plugin/kino-plugin-doramasyt", name: "DoramasYT", kind: "series", needsResolver: true, snapshot: true },
+  { repo: "xuper-plugin/kino-plugin-embed69", name: "Embed 69", kind: "movies", needsResolver: true, snapshot: true },
+  { repo: "xuper-plugin/kino-plugin-lacartoons", name: "LA Cartoons Plus", kind: "kids", needsResolver: true, snapshot: true },
+  { repo: "xuper-plugin/kino-plugin-latino", name: "Latino", kind: "movies", needsResolver: true, snapshot: true },
+  { repo: "xuper-plugin/kino-plugin-mundodonghua", name: "MundoDonghua", kind: "anime", needsResolver: true, snapshot: true },
   { repo: "xuper-plugin/maraton", name: "PelisYSeries", kind: "movies" },
-  { repo: "xuper-plugin/kino-plugin-peliculasflix", name: "PeliculasFlix", kind: "movies", needsResolver: true },
-  { repo: "xuper-plugin/kino-plugin-pelisgo", name: "Pelisgo", kind: "movies", needsResolver: true },
-  { repo: "xuper-plugin/kino-plugin-pelispedia", name: "Pelispedia", kind: "movies", needsResolver: true },
-  { repo: "xuper-plugin/kino-plugin-seriesflix", name: "Seriesflix", kind: "series", needsResolver: true },
-  { repo: "xuper-plugin/kino-plugin-serieskao", name: "SeriesKao", kind: "series", needsResolver: true },
-  { repo: "xuper-plugin/kino-plugin-seriesmetro", name: "SeriesMetro", kind: "series", needsResolver: true },
-  { repo: "xuper-plugin/kino-plugin-sololatino", name: "SoloLatino", kind: "movies", needsResolver: true },
-  { repo: "xuper-plugin/kino-plugin-latanime", name: "TodoAnime", kind: "anime", needsResolver: true },
-  { repo: "xuper-plugin/kino-plugin-verpelis", name: "VerPelis", kind: "movies", needsResolver: true }
+  { repo: "xuper-plugin/kino-plugin-peliculasflix", name: "PeliculasFlix", kind: "movies", needsResolver: true, snapshot: true },
+  { repo: "xuper-plugin/kino-plugin-pelisgo", name: "Pelisgo", kind: "movies", needsResolver: true, snapshot: true },
+  { repo: "xuper-plugin/kino-plugin-pelispedia", name: "Pelispedia", kind: "movies", needsResolver: true, snapshot: true },
+  { repo: "xuper-plugin/kino-plugin-seriesflix", name: "Seriesflix", kind: "series", needsResolver: true, snapshot: true },
+  { repo: "xuper-plugin/kino-plugin-serieskao", name: "SeriesKao", kind: "series", needsResolver: true, snapshot: true },
+  { repo: "xuper-plugin/kino-plugin-seriesmetro", name: "SeriesMetro", kind: "series", needsResolver: true, snapshot: true },
+  { repo: "xuper-plugin/kino-plugin-sololatino", name: "SoloLatino", kind: "movies", needsResolver: true, snapshot: true },
+  { repo: "xuper-plugin/kino-plugin-latanime", name: "TodoAnime", kind: "anime", needsResolver: true, snapshot: true },
+  { repo: "xuper-plugin/kino-plugin-verpelis", name: "VerPelis", kind: "movies", needsResolver: true, snapshot: true }
 ];
 var iconOf = (entry) => `https://raw.githubusercontent.com/${entry.repo}/HEAD/icon.png`;
+
+// src/content.js
+var k = () => globalThis.kino;
+var RAW_HOST = "raw.githubusercontent.com";
+var fileUrl = (repo, name) => `https://${RAW_HOST}/${repo}/main/home/${encodeURIComponent(name)}.json`;
+var CACHE_KEY = "dv:content:v1";
+var FRESH_MS = 30 * 60 * 1e3;
+var FILE_MAX_AGE_MS = 48 * 60 * 60 * 1e3;
+var TABS_PER_PLUGIN = 3;
+var PER_CATEGORY = 30;
+var MIN_PER_CATEGORY = 4;
+var MAX_SLIDES2 = 8;
+var FETCH_MS = 7e3;
+var BATCH = 8;
+var CATEGORIES = [
+  { id: "anime", es: "Anime", en: "Anime", match: /anime|donghua|\bovas?\b/, kinds: ["anime"] },
+  { id: "doramas", es: "Doramas", en: "K-dramas & Asian dramas", match: /dorama|kdrama|jdrama|cdrama|thaidrama|asiatic/ },
+  { id: "infantil", es: "Para los niños", en: "For kids", match: /nino|infantil|familia|cartoon|nickelodeon|disney|foxkids|hanna|warner|kids|marvel/, kinds: ["kids"] },
+  { id: "accion", es: "Acción", en: "Action", match: /accion|action/ },
+  { id: "comedia", es: "Comedia", en: "Comedy", match: /comedia|comedy/ },
+  { id: "terror", es: "Terror", en: "Horror", match: /terror|horror/ },
+  { id: "cienciaficcion", es: "Ciencia ficción", en: "Science fiction", match: /cienciaficcion|scifi|sciencefiction/ },
+  { id: "romance", es: "Romance", en: "Romance", match: /romance|romant/ },
+  { id: "aventura", es: "Aventura", en: "Adventure", match: /aventura|adventure/ },
+  { id: "suspenso", es: "Suspenso y crimen", en: "Thriller & crime", match: /suspens|thriller|misterio|crimen|crime/ },
+  { id: "animacion", es: "Animación", en: "Animation", match: /animacion|animation/ },
+  { id: "documental", es: "Documentales", en: "Documentaries", match: /documental|documentar/ },
+  { id: "drama", es: "Drama", en: "Drama", match: /drama/ },
+  { id: "series", es: "Series", en: "Series", match: /serie|tvshow/ },
+  { id: "estrenos", es: "Estrenos y novedades", en: "New releases", match: /estreno|reciente|nuev|novedad|actualizad|ultim|encines|agregad|emision|latest|new/ },
+  { id: "populares", es: "Populares", en: "Popular", match: /popular|tendencia|valorad|\btop\b|trending|destacad|masvist/ }
+];
+var MORE = { id: "mas", es: "Más para ver", en: "More to watch" };
+var DRAW_ORDER = [
+  "estrenos",
+  "populares",
+  "series",
+  "anime",
+  "doramas",
+  "infantil",
+  "accion",
+  "comedia",
+  "terror",
+  "drama",
+  "cienciaficcion",
+  "romance",
+  "aventura",
+  "suspenso",
+  "animacion",
+  "documental",
+  "mas"
+];
+var fold = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+var year4 = (v) => {
+  const m = /\d{4}/.exec(String(v || ""));
+  return m ? m[0] : "";
+};
+var kindOf = (item) => item.kind === "series" ? "series" : "movie";
+function categoryOf(row, pluginKind) {
+  const t = fold(row.title);
+  for (const c of CATEGORIES) if (c.match.test(t)) return c.id;
+  for (const c of CATEGORIES) if (c.kinds && c.kinds.includes(pluginKind)) return c.id;
+  if (row.items.length > 0 && row.items.every((i) => i.kind === "series")) return "series";
+  return MORE.id;
+}
+function buildContent(sources2) {
+  const chosen = /* @__PURE__ */ new Map();
+  const cardOf2 = (item, src, n) => {
+    if (!item || typeof item.ref !== "string" || typeof item.title !== "string" || !item.title.trim() || item.adult === true) return null;
+    const key = fold(item.title) + "|" + kindOf(item);
+    const have = chosen.get(key);
+    if (have) {
+      for (const f of ["poster", "backdrop", "overview", "rating"]) if (have[f] == null && item[f] != null) have[f] = item[f];
+      if (!have.year && year4(item.year)) have.year = year4(item.year);
+      if (!(have.ids && have.ids.tmdb) && item.ids && item.ids.tmdb) have.ids = { ...have.ids || {}, tmdb: item.ids.tmdb };
+      return have;
+    }
+    const card = {
+      id: (n + "~" + String(item.id || item.ref)).slice(0, 128),
+      ref: item.ref,
+      title: item.title.trim(),
+      kind: kindOf(item),
+      ...year4(item.year) ? { year: year4(item.year) } : {},
+      ...item.poster ? { poster: item.poster } : {},
+      ...item.backdrop ? { backdrop: item.backdrop } : {},
+      ...item.overview ? { overview: String(item.overview) } : {},
+      ...typeof item.rating === "number" ? { rating: item.rating } : {},
+      ...item.ids && item.ids.tmdb ? { ids: { tmdb: item.ids.tmdb } } : {},
+      origin: src.repo
+    };
+    chosen.set(key, card);
+    return card;
+  };
+  const byCategory = /* @__PURE__ */ new Map();
+  sources2.forEach((src, n) => {
+    for (const row of src.rows || []) {
+      if (!row || !Array.isArray(row.items)) continue;
+      const cards = row.items.map((i) => cardOf2(i, src, n)).filter(Boolean);
+      if (row.hidden || cards.length === 0) continue;
+      const cat = categoryOf(row, src.kind);
+      if (!byCategory.has(cat)) byCategory.set(cat, []);
+      byCategory.get(cat).push(cards);
+    }
+  });
+  const rails = [];
+  for (const id of DRAW_ORDER) {
+    const queues = (byCategory.get(id) || []).map((q) => q.slice());
+    const out = [];
+    const seen = /* @__PURE__ */ new Set();
+    while (out.length < PER_CATEGORY && queues.some((q) => q.length)) {
+      for (const q of queues) {
+        const c = q.shift();
+        if (c && !seen.has(c.id) && out.length < PER_CATEGORY) {
+          seen.add(c.id);
+          out.push(c);
+        }
+      }
+    }
+    if (out.length < MIN_PER_CATEGORY) continue;
+    const cat = CATEGORIES.find((c) => c.id === id) || MORE;
+    rails.push({ id, title: cat.es, titleEn: cat.en, items: out });
+  }
+  const drawn = [...new Map(rails.flatMap((r) => r.items).map((c) => [c.id, c])).values()].filter((c) => /^https:\/\//.test(c.backdrop || ""));
+  drawn.sort((a, b) => (b.overview ? 1 : 0) - (a.overview ? 1 : 0));
+  const slides = [];
+  const used = /* @__PURE__ */ new Set();
+  for (let pass = 0; pass < 2 && slides.length < MAX_SLIDES2; pass++) {
+    for (const c of drawn) {
+      if (slides.length >= MAX_SLIDES2 || slides.includes(c)) continue;
+      if (pass === 0 && used.has(c.origin)) continue;
+      used.add(c.origin);
+      slides.push(c);
+    }
+  }
+  return { slides, rails: rails.map((r) => ({ ...r, items: r.items.map(({ backdrop, overview, ...rest }) => rest) })) };
+}
+function contentPlugins(st) {
+  return PLUGINS.filter((p) => p.snapshot === true && st && st.plugins && st.plugins[p.repo]);
+}
+var memo = null;
+function keptContent() {
+  if (memo) return memo;
+  try {
+    const o = JSON.parse(k().storage.get(CACHE_KEY) || "null");
+    if (o && Array.isArray(o.rails) && Array.isArray(o.slides) && Array.isArray(o.repos)) memo = o;
+  } catch (_) {
+  }
+  return memo;
+}
+function contentStale(repos, now = Date.now()) {
+  const c = keptContent();
+  if (!c) return true;
+  if (c.repos.join(",") !== repos.join(",")) return true;
+  return now - Number(c.at) > FRESH_MS;
+}
+async function getJson(url) {
+  try {
+    const r = await k().fetch(url, { timeoutMs: FETCH_MS });
+    if (!r || !r.ok) return null;
+    return JSON.parse(await r.text());
+  } catch (_) {
+    return null;
+  }
+}
+async function inBatches(list, fn) {
+  const out = [];
+  for (let i = 0; i < list.length; i += BATCH) out.push(...await Promise.all(list.slice(i, i + BATCH).map(fn)));
+  return out;
+}
+async function loadContent(plugins, now = Date.now()) {
+  const indexes = await inBatches(plugins, (p) => getJson(fileUrl(p.repo, "index")));
+  const wanted = [];
+  plugins.forEach((p, i) => {
+    const tabs = indexes[i] && Array.isArray(indexes[i].tabs) ? indexes[i].tabs.map((t) => t && t.id).filter((x) => typeof x === "string") : [];
+    for (const id of tabs.slice(0, TABS_PER_PLUGIN)) wanted.push({ p, id });
+  });
+  const files = await inBatches(wanted, (w) => getJson(fileUrl(w.p.repo, w.id)));
+  const rowsOf = new Map(plugins.map((p) => [p.repo, []]));
+  wanted.forEach((w, i) => {
+    const f = files[i];
+    if (!f || f.tab !== w.id || !Array.isArray(f.rows) || now - Number(f.at) > FILE_MAX_AGE_MS) return;
+    rowsOf.get(w.p.repo).push(...f.rows);
+  });
+  const built = buildContent(plugins.map((p) => ({ repo: p.repo, kind: p.kind, rows: rowsOf.get(p.repo) })));
+  memo = { at: now, repos: plugins.map((p) => p.repo), ...built };
+  try {
+    k().storage.set(CACHE_KEY, JSON.stringify(memo));
+  } catch (_) {
+  }
+  return memo;
+}
+var slideNode2 = (s) => ({
+  type: "heroCard",
+  key: "dvslide-" + s.id,
+  h: { compact: 200, expanded: 240 },
+  title: s.title,
+  text: clip(s.overview || [s.year].filter(Boolean).join("")),
+  image: s.backdrop,
+  buttons: [
+    { type: "ElevatedButton", key: "dvwatch-" + s.id, labelText: "Ver", labelTextEn: "Watch", icon: "play", onPressed: { go: { play: titleOf2(s) } } },
+    { type: "TextButton", key: "dvinfo-" + s.id, labelText: "Más información", labelTextEn: "More info", onPressed: { go: { title: titleOf2(s) } } }
+  ]
+});
+var titleOf2 = (s) => ({ ref: s.ref, kind: s.kind, id: s.id, title: s.title });
+var clip = (t) => {
+  const s = String(t || "").trim();
+  return s.length <= 140 ? s : s.slice(0, 139).trimEnd() + "…";
+};
+function contentView(content, loading) {
+  if (!content || content.rails.length === 0) {
+    if (!loading) return [{ type: "Text", key: "contentEmpty", text: "Todavía no hay contenido de tus plugins. Vuelve en un momento.", textEn: "Nothing from your plugins yet. Come back in a moment.", color: "muted" }];
+    return [
+      { type: "Skeleton", key: "contentHeroWait", shape: "block", height: { compact: 200, expanded: 320 } },
+      { type: "Skeleton", key: "contentRailWait", shape: "block", height: 180 }
+    ];
+  }
+  const nodes = [];
+  const s = content.slides;
+  if (s.length === 1) nodes.push(slideNode2(s[0]));
+  else if (s.length > 1) nodes.push({ type: "PageView", key: "dvHero" + s.length, autoPlayMs: 6e3, children: s.map(slideNode2) });
+  for (const r of content.rails) nodes.push({ type: "titleRail", key: "dvrail-" + r.id, title: r.title, titleEn: r.titleEn, items: r.items });
+  return nodes;
+}
 
 // src/page.js
 var POLL_MS2 = 3e3;
 var IDLE_POLL_MS = 5e3;
-var k = () => globalThis.kino;
+var k2 = () => globalThis.kino;
 var say = (es, en) => ({ text: es, textEn: en });
 var label = (es, en) => ({ labelText: es, labelTextEn: en });
 var text = (key, es, en, extra = {}) => ({ type: "Text", key, ...say(es, en), ...extra });
 async function loadStatus() {
-  const kino = k();
+  const kino = k2();
   const out = { ok: false, code: null, plugins: {}, running: false, lastResult: [] };
   if (!kino || typeof kino.manage !== "object") {
     out.code = "old_kino";
@@ -815,15 +1038,40 @@ async function loadStatus() {
   return out;
 }
 function jobIsOn() {
-  const kino = k();
+  const kino = k2();
   try {
     return typeof kino.jobOn === "function" ? !!kino.jobOn("update") : null;
   } catch {
     return null;
   }
 }
-var statusState = (st) => ({ mp: st, jobOn: jobIsOn(), busy: st.running });
+function contentWanted(st) {
+  const plugins = contentPlugins(st);
+  return plugins.length > 0 && contentStale(plugins.map((x) => x.repo));
+}
+var lastStatus = null;
+var statusState = (st) => {
+  lastStatus = st;
+  return { mp: st, jobOn: jobIsOn(), busy: st.running };
+};
 var PAGE_EVENTS = {
+  // The two tabs (shown once a plugin with a ready Home is installed): Mis plugins and Contenido.
+  dvTab({ value, arg }) {
+    const tab = value === "content" || arg === "content" ? "content" : "mine";
+    const plugins = contentPlugins(lastStatus);
+    return { state: { dvTab: tab, contentLoading: tab === "content" && plugins.length > 0 && contentStale(plugins.map((x) => x.repo)) } };
+  },
+  // One build of the Contenido Home (the files of the installed plugins), asked by the page's timer.
+  async contentLoad() {
+    const plugins = contentPlugins(lastStatus);
+    if (plugins.length) {
+      try {
+        await loadContent(plugins);
+      } catch (_) {
+      }
+    }
+    return { state: { contentLoading: false, contentAt: Date.now() } };
+  },
   async refresh() {
     return { state: statusState(await loadStatus()) };
   },
@@ -847,7 +1095,7 @@ var PAGE_EVENTS = {
 async function startPass(only) {
   let notice = null;
   try {
-    const r = await k().manage.updateAll(only ? { only } : void 0);
+    const r = await k2().manage.updateAll(only ? { only } : void 0);
     if (r && r.started === false && r.running) notice = "running";
   } catch (e) {
     notice = e && e.code || "error";
@@ -962,6 +1210,22 @@ function pageView({ state }) {
   });
   if (state && Array.isArray(state.notice)) nodes.push(text("notice", state.notice[0], state.notice[1], { color: "primary" }));
   if (!st) return [...nodes, { type: "Skeleton", key: "loading", shape: "block", height: 160 }];
+  lastStatus = st;
+  if (contentPlugins(st).length > 0) {
+    const tab = state.dvTab === "content" ? "content" : "mine";
+    nodes.push({
+      type: "TabBar",
+      key: "dvTabs",
+      divider: false,
+      value: tab,
+      onChanged: "dvTab",
+      tabs: [{ value: "mine", label: "Mis plugins", labelEn: "My plugins" }, { value: "content", label: "Contenido", labelEn: "Content" }]
+    });
+    if (tab === "content") {
+      nodes.push(...contentView(keptContent(), state.contentLoading === true));
+      return [{ type: "Column", key: "dvPage", crossAxisAlignment: "stretch", padding: { compact: 16, expanded: 24 }, gap: 16, children: nodes }];
+    }
+  }
   if (!st.ok) {
     const why = st.code === "old_kino" ? ["Actualiza Kino para que Da-Video pueda ver y mantener al día tus plugins.", "Update Kino so Da-Video can see your plugins and keep them up to date."] : ["Kino todavía no dejó a Da-Video revisar tus plugins. Revisa sus permisos en Plugins.", "Kino hasn't let Da-Video look at your plugins yet. Check its permissions in Plugins."];
     nodes.push(text("noManage", why[0], why[1], { color: "muted" }));
@@ -1007,7 +1271,7 @@ function pageView({ state }) {
   ));
   return [{ type: "Column", key: "dvPage", crossAxisAlignment: "stretch", padding: { compact: 16, expanded: 24 }, gap: 16, children: nodes }];
 }
-var pageEvery = ({ state }) => ({ ms: state && state.busy ? POLL_MS2 : IDLE_POLL_MS, event: "refresh" });
+var pageEvery = ({ state }) => state && state.contentLoading ? { ms: 1e3, event: "contentLoad" } : { ms: state && state.busy ? POLL_MS2 : IDLE_POLL_MS, event: "refresh" };
 
 // src/plugin.js
 var MINE = "mine";
@@ -1036,7 +1300,7 @@ var standard = () => std ?? (std = makeStandardScreen({
   page: {
     open: async () => {
       const mp = await loadStatus();
-      return { mp, jobOn: jobIsOn(), busy: mp.running, notice: null };
+      return { mp, jobOn: jobIsOn(), busy: mp.running, notice: null, contentLoading: contentWanted(mp) };
     },
     view: pageView,
     every: pageEvery,

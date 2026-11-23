@@ -2,6 +2,7 @@
 // what each needs (an update, its setup), then the ones still to install. Everything it knows comes from Kino:
 // kino.manage.updates() (installed, versions, the update the last check found, whether it still needs setting up).
 import { OWNER, RESOLVER, PLUGINS, entryOf, iconOf } from "./catalog.js";
+import { contentPlugins, contentStale, contentView, keptContent, loadContent } from "./content.js";
 
 const POLL_MS = 3_000;
 const IDLE_POLL_MS = 5_000;
@@ -38,10 +39,30 @@ export function jobIsOn() {
   try { return typeof kino.jobOn === "function" ? !!kino.jobOn("update") : null; } catch { return null; }
 }
 
-const statusState = (st) => ({ mp: st, jobOn: jobIsOn(), busy: st.running });
+/** Whether the Contenido Home should be fetched now (a plugin with a ready Home installed and nothing fresh kept). */
+export function contentWanted(st) {
+  const plugins = contentPlugins(st);
+  return plugins.length > 0 && contentStale(plugins.map((x) => x.repo));
+}
+
+/** The last status read: the tab events know which plugins the Contenido Home is made of. */
+let lastStatus = null;
+const statusState = (st) => { lastStatus = st; return { mp: st, jobOn: jobIsOn(), busy: st.running }; };
 
 /** The page's events (std's `page.events`). */
 export const PAGE_EVENTS = {
+  // The two tabs (shown once a plugin with a ready Home is installed): Mis plugins and Contenido.
+  dvTab({ value, arg }) {
+    const tab = value === "content" || arg === "content" ? "content" : "mine";
+    const plugins = contentPlugins(lastStatus);
+    return { state: { dvTab: tab, contentLoading: tab === "content" && plugins.length > 0 && contentStale(plugins.map((x) => x.repo)) } };
+  },
+  // One build of the Contenido Home (the files of the installed plugins), asked by the page's timer.
+  async contentLoad() {
+    const plugins = contentPlugins(lastStatus);
+    if (plugins.length) { try { await loadContent(plugins); } catch (_) { /* the kept Home stays */ } }
+    return { state: { contentLoading: false, contentAt: Date.now() } };
+  },
   async refresh() {
     return { state: statusState(await loadStatus()) };
   },
@@ -180,6 +201,17 @@ export function pageView({ state }) {
     onSubmitted: "search", trailingIcon: "search", trailingLabel: "Buscar", trailingLabelEn: "Search", onTrailingTap: "search" });
   if (state && Array.isArray(state.notice)) nodes.push(text("notice", state.notice[0], state.notice[1], { color: "primary" }));
   if (!st) return [...nodes, { type: "Skeleton", key: "loading", shape: "block", height: 160 }];
+  lastStatus = st;
+  // With a plugin whose repository keeps a ready Home installed, two tabs: Mis plugins (this page) and Contenido.
+  if (contentPlugins(st).length > 0) {
+    const tab = state.dvTab === "content" ? "content" : "mine";
+    nodes.push({ type: "TabBar", key: "dvTabs", divider: false, value: tab, onChanged: "dvTab",
+      tabs: [{ value: "mine", label: "Mis plugins", labelEn: "My plugins" }, { value: "content", label: "Contenido", labelEn: "Content" }] });
+    if (tab === "content") {
+      nodes.push(...contentView(keptContent(), state.contentLoading === true));
+      return [{ type: "Column", key: "dvPage", crossAxisAlignment: "stretch", padding: { compact: 16, expanded: 24 }, gap: 16, children: nodes }];
+    }
+  }
   if (!st.ok) {
     const why = st.code === "old_kino"
       ? ["Actualiza Kino para que Da-Video pueda ver y mantener al día tus plugins.", "Update Kino so Da-Video can see your plugins and keep them up to date."]
@@ -219,6 +251,8 @@ export function pageView({ state }) {
 /** The page's timer: while a pass or a setup runs, refresh every few seconds. */
 // While a pass or a setup runs, every few seconds; otherwise a slower look, so a plugin installed from here (its own screen
 // opens over this one) shows under «Tus plugins» once the person is back. Cheap: kino.manage.updates() never leaves the device.
-export const pageEvery = ({ state }) => ({ ms: state && state.busy ? POLL_MS : IDLE_POLL_MS, event: "refresh" });
+export const pageEvery = ({ state }) => (state && state.contentLoading
+  ? { ms: 1000, event: "contentLoad" } // the Contenido Home is fetched right after the tab is drawn
+  : { ms: state && state.busy ? POLL_MS : IDLE_POLL_MS, event: "refresh" });
 
 export { entryOf };

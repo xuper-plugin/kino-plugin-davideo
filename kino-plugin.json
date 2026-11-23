@@ -1,7 +1,7 @@
 {
   "id": "davideo",
   "name": "Da-Video",
-  "version": "0.3.5",
+  "version": "0.4.0",
   "apiVersion": 31,
   "entry": "plugin.js",
   "icon": "icon.png",
@@ -9,7 +9,9 @@
   "author": "xuper-plugin",
   "homepage": "https://github.com/xuper-plugin/kino-plugin-davideo",
   "discoverable": false,
-  "hosts": [],
+  "hosts": [
+    "raw.githubusercontent.com"
+  ],
   "capabilities": [
     "screen",
     "schedule",
@@ -61,6 +63,6 @@
   },
   "signature": {
     "authorKey": "6693946bd5c56196960959c4b9665fad5094374bcb85ddb282f8bf762c835263",
-    "value": "bd9c7aa0969df284ed72cb621c8bb697fd7f754271e8347bb7f92b2447b9710bb19e0d31dac38bcd27678844c12c06d47f1a6a0e0b34e537a0d2547d1b898603"
+    "value": "307b1d356713f4a73ff2cf5a193dd0959fa95189a14cceb02dd6c03039e2e403257f681155236d4a4808cc3ff3df18dd3cce3d3fad1f1a78351d745b30e77a0d"
   }
 }
