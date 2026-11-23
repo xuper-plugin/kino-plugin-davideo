@@ -171,7 +171,7 @@ export function pageView({ state }) {
   }
   nodes.push(text("autoText", `Da-Video revisa tus plugins de ${OWNER} cada 4 horas. Cámbialo en Ajustes ▸ Plugins ▸ Da-Video.`,
     `Da-Video checks your ${OWNER} plugins every 4 hours. Change it in Settings ▸ Plugins ▸ Da-Video.`, { color: "muted" }));
-  return [{ type: "Column", key: "dvPage", padding: { compact: 12, expanded: 24 }, gap: 12, children: nodes }];
+  return [{ type: "Column", key: "dvPage", crossAxisAlignment: "stretch", padding: { compact: 12, expanded: 24 }, gap: 12, children: nodes }];
 }
 
 /** The page's timer: while a pass or a setup runs, refresh every few seconds. */

@@ -1,7 +1,7 @@
 // The catalog door every std plugin offers (Kino's plugin protocol): Da-Video and any other plugin of the same author finds
 // titles through it (kino.plugins.callAll over a consumes entry by author, Kino apiVersion 31), and Kino opens and plays what it
 // finds in this plugin, with this plugin's own resolve. A plugin adds CATALOG_PROVIDES to its manifest's "provides" and exports
-//   export const proto_catalog_search = async (arg) => catalogItems(await search({ q: arg.q, type: arg.type }));
+//   export const proto_catalog_search = catalogDoor(search);
 
 /** At most this many titles per answer (the protocol's 64 KB answer limit stays far away). */
 export const CATALOG_MAX = 40;
@@ -26,7 +26,8 @@ const HTTPS = /^https:\/\//;
 /** A plugin's own search results as the door's `Item`s: only what a card needs, the empty fields left out, at most CATALOG_MAX. */
 export function catalogItems(found) {
   const out = [];
-  for (const it of Array.isArray(found) ? found : []) {
+  const list = Array.isArray(found) ? found : found && Array.isArray(found.items) ? found.items : [];
+  for (const it of list) {
     if (out.length >= CATALOG_MAX) break;
     if (!it || typeof it.id !== "string" || !it.id || typeof it.ref !== "string" || !it.ref || typeof it.title !== "string" || !it.title) continue;
     const item = { id: it.id, ref: it.ref, title: it.title, kind: typeof it.kind === "string" && it.kind ? it.kind : "movie" };
@@ -39,4 +40,20 @@ export function catalogItems(found) {
     out.push(item);
   }
   return out;
+}
+
+/** The query Kino itself sends a search, from the door's argument: only the words and the kind are the caller's. */
+export function catalogQuery(arg) {
+  const q = String((arg && arg.q) || "").trim().slice(0, 200);
+  const type = arg && (arg.type === "movie" || arg.type === "series") ? arg.type : "any";
+  return { q, type, season: 0, episode: 0, tmdbId: 0, year: 0, originalTitle: "", altTitles: [], cursor: null };
+}
+
+/** The door's `search` call over a plugin's own [search]: empty words answer nothing, without asking the site. */
+export function catalogDoor(search) {
+  return async (arg) => {
+    const query = catalogQuery(arg);
+    if (!query.q) return [];
+    return catalogItems(await search(query));
+  };
 }

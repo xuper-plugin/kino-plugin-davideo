@@ -156,7 +156,7 @@ export function resultsView(cfg, { q, order, names, pending, found, device = "ph
     shown++;
     body.push(rail({ items: r.items }, "found-" + i, twin("resultsIn", "title", { name }), cfg.imageHeaders));
   });
-  if (!pending.length && shown === 0) body.unshift({ type: "Text", key: "noResults", ...twin("noResults") });
+  if (!pending.length && shown === 0 && order.some((r) => { const x = found.get(r); return x && x.ok; })) body.unshift({ type: "Text", key: "noResults", ...twin("noResults") });
   return {
     type: "Scaffold",
     appBar: bar({ leading: iconButton("back", "arrow_back", "back", "back"), title: { type: "Text", key: "resultsTitle", style: "h4", ...twin("resultsTitle", "text", { q }) } }),

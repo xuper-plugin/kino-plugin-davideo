@@ -283,7 +283,10 @@ function resultsView(cfg, { q, order, names, pending, found, device = "phone" })
     shown++;
     body.push(rail({ items: r.items }, "found-" + i, twin("resultsIn", "title", { name }), cfg.imageHeaders));
   });
-  if (!pending.length && shown === 0) body.unshift({ type: "Text", key: "noResults", ...twin("noResults") });
+  if (!pending.length && shown === 0 && order.some((r) => {
+    const x = found.get(r);
+    return x && x.ok;
+  })) body.unshift({ type: "Text", key: "noResults", ...twin("noResults") });
   return {
     type: "Scaffold",
     appBar: bar({ leading: iconButton("back", "arrow_back", "back", "back"), title: { type: "Text", key: "resultsTitle", style: "h4", ...twin("resultsTitle", "text", { q }) } }),
@@ -647,7 +650,7 @@ function makeStandardScreen({ kino, name, nameEn, logo = null, logoAspect = "1:1
         try {
           answers = await searchHere.searchIn(String(state.rq || ""), batch);
         } catch (e) {
-          log("results", e && e.code || "error");
+          log("results", (e && e.code || "error") + " " + String(e && e.message || "").slice(0, 200));
         }
         for (const repo of batch) {
           const a = (Array.isArray(answers) ? answers : []).find((x) => x && x.repo === repo);
@@ -947,7 +950,7 @@ function pageView({ state }) {
     `Da-Video checks your ${OWNER} plugins every 4 hours. Change it in Settings ▸ Plugins ▸ Da-Video.`,
     { color: "muted" }
   ));
-  return [{ type: "Column", key: "dvPage", padding: { compact: 12, expanded: 24 }, gap: 12, children: nodes }];
+  return [{ type: "Column", key: "dvPage", crossAxisAlignment: "stretch", padding: { compact: 12, expanded: 24 }, gap: 12, children: nodes }];
 }
 var pageEvery = ({ state }) => state && state.busy ? { ms: POLL_MS2, event: "refresh" } : null;
 

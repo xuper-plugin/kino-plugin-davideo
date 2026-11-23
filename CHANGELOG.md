@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.3
+
+- Cards span the page; the search says nothing matched only when some plugin answered; a failed search logs why
+
 ## 0.1.2
 
 - Card spacing on Kino's scale and a Kino icon on Actualizar (nothing dropped)

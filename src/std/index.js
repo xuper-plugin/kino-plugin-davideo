@@ -234,7 +234,7 @@ export function makeStandardScreen({ kino, name, nameEn, logo = null, logoAspect
         const batch = rp.slice(0, SOURCES_PER_TICK);
         const order = Array.isArray(state.rorder) ? state.rorder : [];
         let answers = [];
-        try { answers = await searchHere.searchIn(String(state.rq || ""), batch); } catch (e) { log("results", (e && e.code) || "error"); }
+        try { answers = await searchHere.searchIn(String(state.rq || ""), batch); } catch (e) { log("results", ((e && e.code) || "error") + " " + String((e && e.message) || "").slice(0, 200)); }
         for (const repo of batch) {
           const a = (Array.isArray(answers) ? answers : []).find((x) => x && x.repo === repo);
           found.set(repo, asFound(a, order.indexOf(repo)));
