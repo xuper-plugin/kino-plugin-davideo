@@ -1,7 +1,7 @@
 {
   "id": "davideo",
   "name": "Da-Video",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "apiVersion": 31,
   "entry": "plugin.js",
   "icon": "icon.png",
@@ -21,8 +21,13 @@
     "icon": "movie",
     "menuOpens": "screen",
     "opensFrom": [
-      "menu"
-    ]
+      "menu",
+      "settings"
+    ],
+    "settingsButton": {
+      "label": "Abrir Da-Video",
+      "labelEn": "Open Da-Video"
+    }
   },
   "jobs": [
     {
@@ -56,6 +61,6 @@
   },
   "signature": {
     "authorKey": "6693946bd5c56196960959c4b9665fad5094374bcb85ddb282f8bf762c835263",
-    "value": "61ec8af71041e0cf4cf24a595e4276ef14ef66d4645a94f1962bd0a907cd06685e08cf1e287a08e388b7b57b24846f6abe366d440ccdf48f0b2ba5146277dd00"
+    "value": "410664dc1db051ba0d5e0c321d3ab13ae86cab760ab294beaea37c97c7ddffe235ae3249871135ee0ed66dda2399a50636b2d0bbcd9f8594311edc8b65a7d50e"
   }
 }

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.5
+
+- Abrir Da-Video from its card and its Ajustes page (screen opens from settings too)
+
 ## 0.1.4
 
 - Installing Da-Video also installs Kino Resolver, on the same sheet (bundles, Kino 0.9.93)
