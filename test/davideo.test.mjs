@@ -78,7 +78,7 @@ test("the page: the heart with its update, the person's plugins with what each n
   // The job is off: the one-tap card.
   assert.deepEqual(byKey(tree, "enableAuto").onPressed, { event: "enableAuto" });
   assert.deepEqual(await p.screenEvent({ name: "enableAuto", state: o.state }), { enableJob: "update", state: { jobOn: true } });
-  assert.equal(tree.every, undefined);
+  assert.deepEqual(tree.every, { ms: 5000, event: "refresh" }, "a slow refresh while idle");
   for (const lang of ["es", "en"]) for (const device of ["phone", "tv"]) {
     const t = await p.screen({ state: o.state, device, installed: {} });
     assert.deepEqual(kit.checkScreenTree(fold(t), lang, undefined, { apiVersion: 31 }).dropped, [], `${device}/${lang}`);

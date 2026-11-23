@@ -4,6 +4,7 @@
 import { OWNER, RESOLVER, PLUGINS, entryOf } from "./catalog.js";
 
 const POLL_MS = 3_000;
+const IDLE_POLL_MS = 5_000;
 
 const k = () => globalThis.kino;
 const say = (es, en) => ({ text: es, textEn: en });
@@ -175,6 +176,8 @@ export function pageView({ state }) {
 }
 
 /** The page's timer: while a pass or a setup runs, refresh every few seconds. */
-export const pageEvery = ({ state }) => (state && state.busy ? { ms: POLL_MS, event: "refresh" } : null);
+// While a pass or a setup runs, every few seconds; otherwise a slower look, so a plugin installed from here (its own screen
+// opens over this one) shows under «Tus plugins» once the person is back. Cheap: kino.manage.updates() never leaves the device.
+export const pageEvery = ({ state }) => ({ ms: state && state.busy ? POLL_MS : IDLE_POLL_MS, event: "refresh" });
 
 export { entryOf };

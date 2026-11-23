@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.6
+
+- The list refreshes by itself: a plugin installed from here shows under Tus plugins when you come back
+
 ## 0.1.5
 
 - Abrir Da-Video from its card and its Ajustes page (screen opens from settings too)

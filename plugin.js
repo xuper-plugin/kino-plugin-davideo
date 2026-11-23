@@ -778,6 +778,7 @@ var PLUGINS = [
 
 // src/page.js
 var POLL_MS2 = 3e3;
+var IDLE_POLL_MS = 5e3;
 var k = () => globalThis.kino;
 var say = (es, en) => ({ text: es, textEn: en });
 var label = (es, en) => ({ labelText: es, labelTextEn: en });
@@ -952,7 +953,7 @@ function pageView({ state }) {
   ));
   return [{ type: "Column", key: "dvPage", crossAxisAlignment: "stretch", padding: { compact: 12, expanded: 24 }, gap: 12, children: nodes }];
 }
-var pageEvery = ({ state }) => state && state.busy ? { ms: POLL_MS2, event: "refresh" } : null;
+var pageEvery = ({ state }) => ({ ms: state && state.busy ? POLL_MS2 : IDLE_POLL_MS, event: "refresh" });
 
 // src/plugin.js
 var MINE = "mine";
