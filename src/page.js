@@ -56,8 +56,11 @@ export const PAGE_EVENTS = {
     return { state: statusState(await loadStatus()) };
   },
   // Kino starts every job off: the person's own tap turns the 4-hourly update on (enableJob; Kino drops it from a timer).
-  toggleEdit({ state }) {
-    return { state: { editing: !(state && state.editing) } };
+  pick({ arg }) {
+    return typeof arg === "string" ? { state: { pick: arg }, ui: [{ open: "pluginSheet" }] } : null;
+  },
+  unpick() {
+    return { state: { pick: null } };
   },
   enableAuto() {
     return { enableJob: "update", state: { jobOn: true } };
@@ -123,10 +126,10 @@ const pill = (key, es, en, color, positioned) => ({ type: "Badge", key, text: es
 
 /**
  * One tile of the grid, like an icon on a phone's home screen: the plugin's icon (rounded, 80) with its name under it.
- * Installed: a tap opens it; «Nueva» on the corner when an update waits; in Editar, a delete button on the other corner (never
- * on the heart, Kino Resolver). Not installed: the icon dimmed, a download button on its corner, the name muted.
+ * Installed: a tap opens its sheet (Abrir, then Desinstalar); «Nueva» on the corner when an update waits. Not installed: the icon
+ * dimmed, a download button on its corner, the name muted.
  */
-function pluginTile(entry, row, i, { heart = false, editing = false } = {}) {
+function pluginTile(entry, row, i) {
   const installed = !!row;
   const layers = [
     { type: "Image", key: `icon-${i}`, url: iconOf(entry), w: 80, h: 80, radius: "large", fit: "cover",
@@ -134,10 +137,6 @@ function pluginTile(entry, row, i, { heart = false, editing = false } = {}) {
   ];
   if (installed && row.available) layers.push(pill(`new-${i}`, "Nueva", "New", "primary", { top: 0, right: 0 }));
   else if (installed && entry.setup && row.setupReady === false && !row.setupRunning) layers.push(pill(`setup-${i}`, "Configurar", "Set up", "warning", { top: 0, right: 0 }));
-  if (installed && editing && !heart) {
-    layers.push(round(`un-${i}`, iconBtn(`uninstall-${i}`, "delete", `Desinstalar ${entry.name}`, `Uninstall ${entry.name}`,
-      { go: { uninstallPlugin: { repo: entry.repo } } }, {}), { top: 0, left: 0 }, "error"));
-  }
   if (!installed) {
     layers.push(round(`in-${i}`, iconBtn(`install-${i}`, "download", `Instalar ${entry.name}`, `Install ${entry.name}`,
       { go: { installPlugin: { repo: entry.repo } } }, {}), { bottom: 0, right: 0 }, "primary"));
@@ -145,14 +144,39 @@ function pluginTile(entry, row, i, { heart = false, editing = false } = {}) {
   const icon = { type: "Stack", key: `stack-${i}`, w: 96, h: 96, children: layers };
   const name = text(`name-${i}`, entry.name, entry.name, { style: "caption", textAlign: "center", maxLines: 1, ...(installed ? {} : { color: "muted" }) });
   const tile = { type: "Column", key: `tile-${i}`, gap: 4, crossAxisAlignment: "center", children: [icon, name] };
-  // Installed and not editing: the whole tile is one press that opens the plugin (the heart has no screen of its own to open).
-  if (installed && !editing && !heart) {
-    return { type: "Card", key: `card-${i}`, variant: "plain", flush: true, onTap: { go: { plugin: { repo: entry.repo } } }, children: [tile] };
+  // Installed: the whole tile is one press that opens its sheet (Abrir, Desinstalar).
+  if (installed) {
+    return { type: "Card", key: `card-${i}`, variant: "plain", flush: true, onTap: { event: "pick", arg: entry.repo }, children: [tile] };
   }
   return { ...tile, key: `card-${i}` };
 }
 
 const grid = (key, tiles) => ({ type: "GridView", key, columns: { compact: 3, medium: 4, expanded: 6 }, gap: 16, children: tiles });
+
+/**
+ * The sheet a tap on an installed icon opens: its icon and name, Abrir, and Desinstalar below it (never for the heart, Kino
+ * Resolver, which Da-Video keeps). Declared once; its body follows `state.pick`.
+ */
+function pluginSheet(state, st) {
+  const entry = state && state.pick ? [RESOLVER, ...PLUGINS].find((p) => p.repo === state.pick) : null;
+  const row = entry ? st.plugins[entry.repo] : null;
+  const children = entry && row ? [
+    { type: "Row", key: "sheetHead", gap: 12, crossAxisAlignment: "center", children: [
+      { type: "Image", key: "sheetIcon", url: iconOf(entry), w: 48, h: 48, radius: "medium", fit: "cover" },
+      { type: "Column", key: "sheetTitle", gap: 4, children: [
+        text("sheetName", entry.name, entry.name, { style: "h5" }),
+        text("sheetVer", row.available ? `v${row.version} · hay una nueva: v${row.available}` : `v${row.version}`,
+          row.available ? `v${row.version} · a new one: v${row.available}` : `v${row.version}`, { style: "caption", color: "muted" }),
+      ] },
+    ] },
+    { type: "ElevatedButton", key: "sheetOpen", icon: "open_in_new", ...label("Abrir", "Open"), onPressed: { go: { plugin: { repo: entry.repo } } } },
+    ...(row.available ? [{ type: "Button", key: "sheetUpdate", variant: "secondary", icon: "refresh", ...label(`Actualizar a v${row.available}`, `Update to v${row.available}`), onPressed: { event: "updateOne", arg: entry.repo } }] : []),
+    ...(entry.setup && row.setupReady === false && !row.setupRunning ? [{ type: "Button", key: "sheetSetup", variant: "secondary", icon: "settings", ...label("Configurar", "Set up"), onPressed: { event: "setupPlugin", arg: entry.repo } }] : []),
+    ...(entry.setup && row.setupRunning ? [text("sheetSetupRun", "Configurándose…", "Setting up…", { color: "muted" })] : []),
+    ...(entry !== RESOLVER ? [{ type: "TextButton", key: "sheetUninstall", icon: "delete", ...label("Desinstalar", "Uninstall"), color: "error", onPressed: { go: { uninstallPlugin: { repo: entry.repo } } } }] : []),
+  ] : [text("sheetEmpty", "…", "…", { color: "muted" })];
+  return { type: "BottomSheet", key: "pluginSheet", onClose: "unpick", children: [{ type: "Column", key: "sheetBody", gap: 12, crossAxisAlignment: "stretch", padding: 16, children }] };
+}
 
 /** The page's nodes (std's `page.view`). */
 export function pageView({ state }) {
@@ -177,7 +201,6 @@ export function pageView({ state }) {
       { type: "ElevatedButton", key: "enableAuto", icon: "sync", ...label("Activar", "Turn on"), onPressed: { event: "enableAuto" } },
     ] }] });
   }
-  const editing = !!(state && state.editing);
   // The heart (Kino Resolver) is one more plugin, first of its group.
   const all = [RESOLVER, ...PLUGINS];
   const installed = all.filter((p) => st.plugins[p.repo]);
@@ -187,14 +210,14 @@ export function pageView({ state }) {
     text("mineTitle", "Tus plugins", "Your plugins", { style: "h5", weight: 1 }),
     iconBtn("checkNow", "refresh", st.running ? "Actualizando…" : updates ? `Actualizar ${updates}` : "Buscar actualizaciones",
       st.running ? "Updating…" : updates ? `Update ${updates}` : "Check for updates", { event: "checkNow" }),
-    ...(installed.length > 1 ? [{ type: "TextButton", key: "editToggle", ...label(editing ? "Listo" : "Editar", editing ? "Done" : "Edit"), onPressed: { event: "toggleEdit" } }] : []),
   ] });
-  if (installed.length) nodes.push(grid("mineGrid", installed.map((p) => pluginTile(p, st.plugins[p.repo], all.indexOf(p), { heart: p === RESOLVER, editing }))));
+  if (installed.length) nodes.push(grid("mineGrid", installed.map((p) => pluginTile(p, st.plugins[p.repo], all.indexOf(p)))));
   else nodes.push(text("mineEmpty", "Todavía no tienes ninguno. Instala uno de abajo.", "You don't have any yet. Install one below.", { color: "muted" }));
   if (missing.length) {
     nodes.push(text("missingTitle", "Para instalar", "To install", { style: "h5" }));
-    nodes.push(grid("missingGrid", missing.map((p) => pluginTile(p, null, all.indexOf(p), { heart: p === RESOLVER }))));
+    nodes.push(grid("missingGrid", missing.map((p) => pluginTile(p, null, all.indexOf(p)))));
   }
+  nodes.push(pluginSheet(state, st));
   nodes.push(text("autoText", `Da-Video revisa tus plugins de ${OWNER} cada 4 horas. Cámbialo en Ajustes ▸ Plugins ▸ Da-Video.`,
     `Da-Video checks your ${OWNER} plugins every 4 hours. Change it in Settings ▸ Plugins ▸ Da-Video.`, { style: "caption", color: "muted" }));
   return [{ type: "Column", key: "dvPage", crossAxisAlignment: "stretch", padding: { compact: 16, expanded: 24 }, gap: 16, children: nodes }];

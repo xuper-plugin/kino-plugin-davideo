@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.1
+
+- A tap on one of your plugins opens a sheet: Abrir, Actualizar when a new version waits, Configurar when it needs it, and Desinstalar below (no Editar mode)
+
 ## 0.3.0
 
 - New look: your plugins as home-screen icons, three per row, then the ones to install (dimmed, a download button each); Nueva on an update; Editar shows the delete buttons

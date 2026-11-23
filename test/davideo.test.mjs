@@ -69,24 +69,29 @@ test("the page (design C): home-screen icons, yours then the ones to install, Ed
   assert.equal(byKey(tree, "dvSearch").type, "TextField");
   assert.ok(!byKey(tree, "searchButton"));
   assert.equal(byKey(tree, "close").icon, "arrow_back");
-  // Yours: the heart first, then HDFull and Seriesflix; a tap opens one (never the heart).
+  // Yours: the heart first, then HDFull and Seriesflix; a tap on any asks for its sheet.
   assert.deepEqual(byKey(tree, "mineGrid").children.map((c) => c.key), ["card-0", "card-7", "card-15"]);
-  assert.deepEqual(byKey(tree, "card-7").onTap, { go: { plugin: { repo: HDFULL } } });
-  assert.equal(byKey(tree, "card-0").onTap, undefined);
+  assert.deepEqual(byKey(tree, "card-7").onTap, { event: "pick", arg: HDFULL });
   // «Nueva» on the ones with an update (the heart and Seriesflix); «Configurar» on HDFull, which needs its setup.
   assert.ok(byKey(tree, "new-0") && byKey(tree, "new-15") && byKey(tree, "setup-7"));
   // The rest: dimmed, with a download button each (20 of them).
   const installs = nodes(tree).filter((n) => n.onPressed && n.onPressed.go && n.onPressed.go.installPlugin);
   assert.equal(installs.length, 20);
   assert.equal(byKey(tree, "missingGrid").children.length, 20);
-  // No delete button until Editar; then one per plugin but the heart, and no tap to open while editing.
-  assert.ok(!nodes(tree).some((n) => n.onPressed && n.onPressed.go && n.onPressed.go.uninstallPlugin));
-  const e = await p.screenEvent({ name: "toggleEdit", state: o.state });
-  const te = await p.screen({ state: { ...o.state, ...e.state }, device: "phone", installed: {} });
-  const dels = nodes(te).filter((n) => n.onPressed && n.onPressed.go && n.onPressed.go.uninstallPlugin).map((n) => n.onPressed.go.uninstallPlugin.repo);
-  assert.deepEqual(dels, [HDFULL, SERIESFLIX]);
-  assert.equal(byKey(te, "card-7").onTap, undefined);
-  assert.equal(byKey(te, "editToggle").labelText, "Listo");
+  // The sheet: Abrir, Configurar (HDFull needs its setup), Desinstalar; never Desinstalar for the heart.
+  const pk = await p.screenEvent({ name: "pick", arg: HDFULL, state: o.state });
+  assert.deepEqual(pk.ui, [{ open: "pluginSheet" }]);
+  const te = await p.screen({ state: { ...o.state, ...pk.state }, device: "phone", installed: {} });
+  assert.deepEqual(byKey(te, "sheetOpen").onPressed, { go: { plugin: { repo: HDFULL } } });
+  assert.deepEqual(byKey(te, "sheetSetup").onPressed, { event: "setupPlugin", arg: HDFULL });
+  assert.deepEqual(byKey(te, "sheetUninstall").onPressed, { go: { uninstallPlugin: { repo: HDFULL } } });
+  const ps = await p.screenEvent({ name: "pick", arg: SERIESFLIX, state: o.state });
+  const ts = await p.screen({ state: { ...o.state, ...ps.state }, device: "phone", installed: {} });
+  assert.deepEqual(byKey(ts, "sheetUpdate").onPressed, { event: "updateOne", arg: SERIESFLIX });
+  const ph = await p.screenEvent({ name: "pick", arg: RESOLVER, state: o.state });
+  const th = await p.screen({ state: { ...o.state, ...ph.state }, device: "phone", installed: {} });
+  assert.ok(byKey(th, "sheetOpen") && !byKey(th, "sheetUninstall"));
+  assert.deepEqual(await p.screenEvent({ name: "unpick", state: ph.state }), { state: { pick: null } });
   // The job is off: the one-tap card.
   assert.deepEqual(byKey(tree, "enableAuto").onPressed, { event: "enableAuto" });
   assert.deepEqual(await p.screenEvent({ name: "enableAuto", state: o.state }), { enableJob: "update", state: { jobOn: true } });
