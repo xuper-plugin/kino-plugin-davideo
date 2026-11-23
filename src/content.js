@@ -13,6 +13,7 @@ export const RAW_HOST = "raw.githubusercontent.com";
 export const CACHE_KEY = "dv:content:v1";
 /** A kept Home younger than this opens as it is; older, it is shown at once and fetched again behind it. */
 export const FRESH_MS = 30 * 60 * 1000;
+export const RETRY_MS = 2 * 60 * 1000;
 const PER_CATEGORY = 30;
 const MIN_PER_CATEGORY = 4;
 export const MAX_SLIDES = 8;
@@ -194,6 +195,8 @@ export function contentStale(repos, now = Date.now()) {
   const c = keptContent();
   if (!c) return true;
   if (c.repos.join(",") !== repos.join(",")) return true;
+  // A Home kept without a slider (a lagging copy of the shared file) is asked again soon, not after FRESH_MS.
+  if (c.slides.length === 0 && now - Number(c.at) > RETRY_MS) return true;
   return now - Number(c.at) > FRESH_MS;
 }
 

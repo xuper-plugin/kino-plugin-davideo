@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.3
+
+- A Contenido Home kept without a slider (a lagging copy of the shared file) is asked again after 2 minutes.
+
 ## 0.4.2
 
 - The shared Home keeps a backdrop and a synopsis only on the slider's candidates (4 per plugin): the title page takes the description from TMDB. About 93 KB on the wire.

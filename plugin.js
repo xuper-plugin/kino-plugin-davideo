@@ -790,6 +790,7 @@ var k = () => globalThis.kino;
 var RAW_HOST = "raw.githubusercontent.com";
 var CACHE_KEY = "dv:content:v1";
 var FRESH_MS = 30 * 60 * 1e3;
+var RETRY_MS = 2 * 60 * 1e3;
 var PER_CATEGORY = 30;
 var MIN_PER_CATEGORY = 4;
 var MAX_SLIDES2 = 8;
@@ -839,6 +840,7 @@ function contentStale(repos, now = Date.now()) {
   const c = keptContent();
   if (!c) return true;
   if (c.repos.join(",") !== repos.join(",")) return true;
+  if (c.slides.length === 0 && now - Number(c.at) > RETRY_MS) return true;
   return now - Number(c.at) > FRESH_MS;
 }
 var SHARED_URL = `https://${RAW_HOST}/xuper-plugin/kino-plugin-davideo/main/home/content.json`;

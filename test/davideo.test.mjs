@@ -244,3 +244,18 @@ test("Contenido: no tabs while no plugin with a ready Home is installed", async 
   assert.ok(!byKey(t, "dvTabs"));
   assert.ok(!o.state.contentLoading);
 });
+
+test("Contenido: a Home kept without a slider is asked again after 2 minutes, a full one after 30", async () => {
+  const { contentStale, CACHE_KEY } = await import("../src/content.js");
+  const store = new Map();
+  globalThis.kino = { storage: { get: (k) => store.get(k) ?? null, set: (k, v) => store.set(k, v), remove: (k) => store.delete(k) } };
+  // keptContent() caches in memory: this test only reads what contentStale decides from a kept Home through a fresh import.
+  const mod = await import(`../src/content.js?stale-${Math.random()}`);
+  const now = Date.now();
+  store.set(mod.CACHE_KEY, JSON.stringify({ at: now - 3 * 60 * 1000, repos: ["a/b"], slides: [], rails: [] }));
+  assert.equal(mod.contentStale(["a/b"], now), true);
+  const mod2 = await import(`../src/content.js?stale2-${Math.random()}`);
+  store.set(mod2.CACHE_KEY, JSON.stringify({ at: now - 3 * 60 * 1000, repos: ["a/b"], slides: [{ id: "x" }], rails: [] }));
+  assert.equal(mod2.contentStale(["a/b"], now), false);
+  assert.ok(contentStale && CACHE_KEY);
+});
