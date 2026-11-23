@@ -936,7 +936,10 @@ function pluginCard(entry, row, last, i, { heart = false } = {}) {
     // Installed: a green edge (Kino's success colour); a tap on it opens the plugin (never the heart: it has no screen to show).
     ...installed ? { border: { width: 2, color: "success" } } : {},
     ...installed && !heart ? { onTap: { go: { plugin: { repo: entry.repo } } } } : {},
-    children: [{ type: "Column", padding: 8, gap: 4, crossAxisAlignment: "center", children: [
+    // Every card the same: the whole cell's width and one height, the buttons always at the bottom.
+    fill: true,
+    h: 240,
+    children: [{ type: "Column", padding: 8, gap: 4, crossAxisAlignment: "center", mainAxisAlignment: "spaceBetween", fill: true, children: [
       ...lines,
       ...buttons.length ? [{ type: "Row", key: `actions-${i}`, mainAxisAlignment: buttons.length > 1 ? "spaceBetween" : "center", children: buttons }] : []
     ] }]

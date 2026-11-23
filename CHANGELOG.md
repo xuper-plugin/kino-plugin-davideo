@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.4
+
+- Every card the same size, filling its cell, the buttons at the bottom
+
 ## 0.2.3
 
 - No open button: a tap on the card opens the plugin
