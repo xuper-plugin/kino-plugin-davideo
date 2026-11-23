@@ -66,6 +66,14 @@
         "refusedNote": "catalogOnly existe desde Kino {fromApp}: un Kino anterior ignora el campo y rechaza este plugin porque le falta \"{missing}\". Para que también se instale ahí, declara y exporta resolve (que falle con not_found) y search o home"
       }
     },
+    "bundles": {
+      "$comment": "\"bundles\": [\"owner/name\", ...] (apiVersion 31, Kino 0.9.93): plugins installed together with this one, on its same consent sheet (\"Tambien instala <name>, del mismo autor, con estos permisos:\" followed by the servers it connects to and its own lines). Only on a first install from GitHub, only repositories of the same GitHub owner as the address the plugin is installed from, never one already installed or one the person removed; a bundle that cannot be read is left out and the main install goes on. Each is recorded and synced like the person's own install.",
+      "apiVersion": 31,
+      "max": 3,
+      "maxRepoChars": 100,
+      "badMessage": "The \"bundles\" field must be a list of at most 3 plain GitHub owner/name repositories",
+      "apiMessage": "The \"bundles\" field needs apiVersion 31"
+    },
     "recommends": {
       "$comment": "\"recommends\": [\"owner/name\", ...] (Kino 0.9.81, additive: no apiVersion, valid at every one, an older Kino ignores the field). The plugins this one works better with, each a plain GitHub owner/name as written (case kept; PluginAddress.bareRepoOf: at most maxRepoChars, no ://, no URL, no sub-path, no @ref), at most max of them; a repeat (case-insensitive) collapses, keeping the first. Anything else (not an array, more than max, a bad entry) makes the manifest invalid on field recommends. The plugin's screen and screenEvent receive installed, { \"<repo as written>\": true | false }, one key per entry (so {} when it declares none): whether that plugin is installed now on this device, never anything else. Kino calls screen again whenever it changes.",
       "max": 8,

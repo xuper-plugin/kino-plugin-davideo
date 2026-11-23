@@ -761,6 +761,20 @@ function validateManifestObject(o, { knownPermissions = contract.permissions } =
       if (!seen.has(repo.toLowerCase())) { seen.add(repo.toLowerCase()); recommends.push(repo); }
     }
   }
+  // "bundles" (apiVersion 31, contract.manifest.bundles): at most `max` plain GitHub owner/name installed with this plugin.
+  const bn = m.bundles;
+  let bundles = [];
+  if (o.bundles !== undefined && o.bundles !== null) {
+    if (!Array.isArray(o.bundles)) return bad("bundles", bn.badMessage);
+    if (o.apiVersion < bn.apiVersion) return bad("bundles", bn.apiMessage);
+    if (o.bundles.length > bn.max) return bad("bundles", bn.badMessage);
+    const seen = new Set();
+    for (const entry of o.bundles) {
+      const repo = bareRepoOf(entry, bn.maxRepoChars);
+      if (repo === null) return bad("bundles", bn.badMessage);
+      if (!seen.has(repo.toLowerCase())) { seen.add(repo.toLowerCase()); bundles.push(repo); }
+    }
+  }
   // "catalogOnly": true (Kino 0.9.54, additive: valid at every apiVersion, ignored by older apps) lists titles and plays none:
   // `resolve` is not required, one of its own atLeastOneOf is, and nothing that only serves playback may be declared.
   const co = m.catalogOnly;
@@ -1168,6 +1182,8 @@ function validateManifestObject(o, { knownPermissions = contract.permissions } =
   const out = { ...o, hosts: [...new Set(hosts)], capabilities: caps, permissions: o.permissions || [], settings: settingsOut, insecureHosts, liveStreamHostsAny, streamHostsAny, fetchHostsAny, discoverable, categories, debug, telemetry, browser, browserPages, visualBrowser, section, panel, screen, slot, theme, appThemes, secrets, secretKeyEncodings, catalogOnly, openFromRoutes, setup, resolveAhead };
   // The parsed `recommends` (deduplicated, as written); none when it declares none.
   if (recommends.length) out.recommends = recommends; else delete out.recommends;
+  // The parsed `bundles` (apiVersion 31), as written; none when it declares none.
+  if (bundles.length) out.bundles = bundles; else delete out.bundles;
   // Task 8q: the parsed jobs (labels scrubbed, options sorted); none below apiVersion 14 or without `schedule`.
   if (o.apiVersion >= contract.kinoJobs.apiVersion) out.jobs = jobs; else delete out.jobs;
   // apiVersion 15: the parsed `pluginStore` block ({ mode, name }); none without the capability.

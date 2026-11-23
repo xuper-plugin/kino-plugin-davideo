@@ -1,7 +1,7 @@
 {
   "id": "davideo",
   "name": "Da-Video",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "apiVersion": 31,
   "entry": "plugin.js",
   "icon": "icon.png",
@@ -42,6 +42,9 @@
   "recommends": [
     "xuper-plugin/kino-plugin-kino-resolver"
   ],
+  "bundles": [
+    "xuper-plugin/kino-plugin-kino-resolver"
+  ],
   "consumes": {
     "mine": {
       "author": "xuper-plugin",
@@ -53,6 +56,6 @@
   },
   "signature": {
     "authorKey": "6693946bd5c56196960959c4b9665fad5094374bcb85ddb282f8bf762c835263",
-    "value": "a221c5c0cadfa941b75f50ae0594ce5e82f28f30594618e512e7e309d6b588aaa3ac8232c23af3cceb6ae201f4a9c6f9341a82a2dc0060a2c88f2481c2455005"
+    "value": "61ec8af71041e0cf4cf24a595e4276ef14ef66d4645a94f1962bd0a907cd06685e08cf1e287a08e388b7b57b24846f6abe366d440ccdf48f0b2ba5146277dd00"
   }
 }

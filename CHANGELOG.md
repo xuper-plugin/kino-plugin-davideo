@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.4
+
+- Installing Da-Video also installs Kino Resolver, on the same sheet (bundles, Kino 0.9.93)
+
 ## 0.1.3
 
 - Cards span the page; the search says nothing matched only when some plugin answered; a failed search logs why
