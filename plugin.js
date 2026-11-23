@@ -144,6 +144,7 @@ var tabBar = (tabs, active) => ({
 });
 var iconButton = (key, icon, word, onPressed) => ({ type: "IconButton", key, icon, ...twin(word, "labelText"), ...twin(word, "tooltip"), onPressed });
 var searchOpenOps = (tabsInBar) => [
+  { hide: "close" },
   { hide: "brand" },
   { hide: "searchButton" },
   { hide: "settingsButton" },
@@ -156,11 +157,13 @@ var searchClosedOps = (tabsInBar) => [
   { hide: "closeSearch" },
   { hide: "q" },
   { clear: "q" },
+  { show: "close" },
   { show: "brand" },
   { show: "searchButton" },
   { show: "settingsButton" },
   ...tabsInBar ? [{ show: "tabs" }] : []
 ];
+var leaveButton = (cfg) => cfg.backArrow ? iconButton("close", "arrow_back", "back", { go: { close: true } }) : iconButton("close", "close", "close", { go: { close: true } });
 function supportNode(device) {
   if (device === "tv") return { type: "QrImage", key: "donate", value: SUPPORT_URL, size: "large", ...twin("supportTv", "labelText") };
   return { type: "ElevatedButton", key: "donate", icon: "heart", ...twin("support", "labelText"), onPressed: { go: { url: { href: SUPPORT_URL } } } };
@@ -230,8 +233,7 @@ function browseView(cfg, { tab, data, recent, pending, failed, searching = false
   const banner = body.length > 0 && isBanner(body[0]) ? body.shift() : null;
   const tabsInBar = tv && withTabs;
   const appBar = bar({
-    // backArrow (std 1.7.0): the screen leaves with Kino's back arrow instead of the X.
-    leading: cfg.backArrow ? iconButton("close", "arrow_back", "back", { go: { close: true } }) : iconButton("close", "close", "close", { go: { close: true } }),
+    leading: leaveButton(cfg),
     title: { type: "Row", key: "titleRow", gap: tabsInBar ? 24 : 8, crossAxisAlignment: "center", children: [
       { ...iconButton("closeSearch", "arrow_back", "back", { ui: searchClosedOps(tabsInBar), event: "searchClosed" }), hidden: true },
       brand(cfg),
@@ -310,7 +312,7 @@ function gateView(cfg, device = "phone") {
   const name = [cfg.name, cfg.nameEn || cfg.name];
   return {
     type: "Scaffold",
-    appBar: bar({ leading: iconButton("close", "close", "close", { go: { close: true } }), title: brand(cfg) }),
+    appBar: bar({ leading: leaveButton(cfg), title: brand(cfg) }),
     body: { type: "Column", key: "gate", mainAxisAlignment: "center", crossAxisAlignment: "center", padding: 24, gap: 16, children: [
       { type: "Text", key: "gateTitle", style: "h3", ...twin("gateTitle") },
       { type: "Text", key: "gateText", style: "p", ...twin("gateText", "text", { name }) },
@@ -428,8 +430,8 @@ var INFLIGHT_KEY = "std:inflight";
 var INFLIGHT_STALE_MS = 18e3;
 var MAX_META_TICKS = 10;
 var DEFAULT_TABS = [{ id: "inicio", label: "Inicio", labelEn: "Home" }];
-function makeStandardScreen({ kino, name, nameEn, logo = null, logoAspect = "1:1", needsResolver, hasSettings, tabs, loadTab, homeKey = null, titleOf: titleOf2, typeOf, tmdbPictures = false, imageHeaders = null, searchHere = null, page = null, barSearch = true, backArrow = false }) {
-  const cfg = { name, nameEn, logo, logoAspect, imageHeaders, hasSettings: !!hasSettings, barSearch: barSearch !== false, backArrow: backArrow === true, tabs: Array.isArray(tabs) && tabs.length > 0 ? tabs : DEFAULT_TABS };
+function makeStandardScreen({ kino, name, nameEn, logo = null, logoAspect = "1:1", needsResolver, hasSettings, tabs, loadTab, homeKey = null, titleOf: titleOf2, typeOf, tmdbPictures = false, imageHeaders = null, searchHere = null, page = null, barSearch = true, backArrow = true }) {
+  const cfg = { name, nameEn, logo, logoAspect, imageHeaders, hasSettings: !!hasSettings, barSearch: barSearch !== false, backArrow: backArrow !== false, tabs: Array.isArray(tabs) && tabs.length > 0 ? tabs : DEFAULT_TABS };
   const TAB_IDS = cfg.tabs.map((t) => t.id);
   const meta = makeMetaCache({ kino, titleOf: titleOf2, typeOf, tmdbPictures });
   function slidesFromMeta(rails) {

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.4
+
+- std 1.7.1: the search field hides the bar's back arrow while open.
+
 ## 0.3.3
 
 - A plugin that still needs setting up (Kino says so) shows Configurar instead of Abrir, opening its own screen
