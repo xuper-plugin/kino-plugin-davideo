@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.0
+
+- New look: your plugins as home-screen icons, three per row, then the ones to install (dimmed, a download button each); Nueva on an update; Editar shows the delete buttons
+
 ## 0.2.4
 
 - Every card the same size, filling its cell, the buttons at the bottom

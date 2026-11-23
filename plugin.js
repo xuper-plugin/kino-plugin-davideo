@@ -834,9 +834,8 @@ var PAGE_EVENTS = {
     return { state: statusState(await loadStatus()) };
   },
   // Kino starts every job off: the person's own tap turns the 4-hourly update on (enableJob; Kino drops it from a timer).
-  filter({ value }) {
-    const v = Array.isArray(value) ? value[0] : value;
-    return { state: { filter: FILTERS.includes(v) ? v : "all" } };
+  toggleEdit({ state }) {
+    return { state: { editing: !(state && state.editing) } };
   },
   enableAuto() {
     return { enableJob: "update", state: { jobOn: true } };
@@ -881,76 +880,71 @@ function noticeOf(code) {
       return ["Kino no pudo hacerlo esta vez.", "Kino couldn't do it this time."];
   }
 }
-var resultLine = (r) => {
-  if (!r || typeof r.status !== "string") return null;
-  switch (r.status) {
-    case "updated":
-      return [`Actualizado a ${r.to}`, `Updated to ${r.to}`];
-    case "left":
-      return [`La versión ${r.to} espera tu aprobación en Plugins`, `Version ${r.to} waits for your approval in Plugins`];
-    case "later":
-      return [`Se actualizará cuando termine el video`, `It will update when the video ends`];
-    case "failed":
-      return [`No se pudo actualizar esta vez`, `Couldn't update this time`];
-    default:
-      return null;
-  }
-};
-var iconBtn = (key, icon, es, en, onPressed) => ({ type: "IconButton", key, icon, labelText: es, labelTextEn: en, tooltip: es, tooltipEn: en, onPressed });
-function pluginCard(entry, row, last, i, { heart = false } = {}) {
+var iconBtn = (key, icon, es, en, onPressed, extra = {}) => ({ type: "IconButton", key, icon, labelText: es, labelTextEn: en, tooltip: es, tooltipEn: en, onPressed, ...extra });
+var round = (key, button, positioned, fill2) => ({ type: "Stack", key, w: 40, h: 40, radius: "full", background: fill2, positioned, children: [button] });
+var pill = (key, es, en, color, positioned) => ({ type: "Badge", key, text: es, textEn: en, color, positioned });
+function pluginTile(entry, row, i, { heart = false, editing = false } = {}) {
   const installed = !!row;
-  const lines = [
+  const layers = [
     {
       type: "Image",
       key: `icon-${i}`,
       url: iconOf(entry),
-      w: 64,
-      h: 64,
+      w: 80,
+      h: 80,
       radius: "large",
       fit: "cover",
-      fallback: { type: "Icon", key: `iconFb-${i}`, name: "movie", color: "muted" }
-    },
-    text(`name-${i}`, entry.name, entry.name, { style: "label", textAlign: "center", maxLines: 1 })
+      positioned: { top: 8, left: 8 },
+      ...installed ? {} : { opacity: 0.5 }
+    }
   ];
-  if (installed && row.available) {
-    lines.push({ type: "Badge", key: `updBadge-${i}`, text: `v${row.available}`, textEn: `v${row.available}`, color: "primary" });
-  } else if (installed) {
-    lines.push(text(`ver-${i}`, `v${row.version}`, `v${row.version}`, { style: "caption", color: "muted", textAlign: "center" }));
+  if (installed && row.available) layers.push(pill(`new-${i}`, "Nueva", "New", "primary", { top: 0, right: 0 }));
+  else if (installed && entry.setup && row.setupReady === false && !row.setupRunning) layers.push(pill(`setup-${i}`, "Configurar", "Set up", "warning", { top: 0, right: 0 }));
+  if (installed && editing && !heart) {
+    layers.push(round(`un-${i}`, iconBtn(
+      `uninstall-${i}`,
+      "delete",
+      `Desinstalar ${entry.name}`,
+      `Uninstall ${entry.name}`,
+      { go: { uninstallPlugin: { repo: entry.repo } } },
+      {}
+    ), { top: 0, left: 0 }, "error"));
   }
-  if (installed && entry.setup && row.setupReady === false && !row.setupRunning) {
-    lines.push(text(`setupNeed-${i}`, "Configúralo", "Set it up", { style: "caption", color: "error", textAlign: "center" }));
-  }
-  const l = installed ? resultLine(last) : null;
-  if (l && last.status !== "updated") lines.push(text(`last-${i}`, l[0], l[1], { style: "caption", color: "muted", textAlign: "center", maxLines: 2 }));
-  const buttons = [];
   if (!installed) {
-    buttons.push(iconBtn(`install-${i}`, "download", `Instalar ${entry.name}`, `Install ${entry.name}`, { go: { installPlugin: { repo: entry.repo } } }));
-  } else {
-    if (!heart) buttons.push(iconBtn(`uninstall-${i}`, "delete", `Desinstalar ${entry.name}`, `Uninstall ${entry.name}`, { go: { uninstallPlugin: { repo: entry.repo } } }));
-    if (row.available) buttons.push(iconBtn(`update-${i}`, "refresh", `Actualizar ${entry.name}`, `Update ${entry.name}`, { event: "updateOne", arg: entry.repo }));
-    if (entry.setup && row.setupReady === false && !row.setupRunning) buttons.push(iconBtn(`setup-${i}`, "settings", `Configurar ${entry.name}`, `Set up ${entry.name}`, { event: "setupPlugin", arg: entry.repo }));
+    layers.push(round(`in-${i}`, iconBtn(
+      `install-${i}`,
+      "download",
+      `Instalar ${entry.name}`,
+      `Install ${entry.name}`,
+      { go: { installPlugin: { repo: entry.repo } } },
+      {}
+    ), { bottom: 0, right: 0 }, "primary"));
   }
-  return {
-    type: "Card",
-    key: `card-${i}`,
-    // Installed: a green edge (Kino's success colour); a tap on it opens the plugin (never the heart: it has no screen to show).
-    ...installed ? { border: { width: 2, color: "success" } } : {},
-    ...installed && !heart ? { onTap: { go: { plugin: { repo: entry.repo } } } } : {},
-    // Every card the same: the whole cell's width and one height, the buttons always at the bottom.
-    fill: true,
-    h: 240,
-    children: [{ type: "Column", padding: 8, gap: 4, crossAxisAlignment: "center", mainAxisAlignment: "spaceBetween", fill: true, children: [
-      ...lines,
-      ...buttons.length ? [{ type: "Row", key: `actions-${i}`, mainAxisAlignment: buttons.length > 1 ? "spaceBetween" : "center", children: buttons }] : []
-    ] }]
-  };
+  const icon = { type: "Stack", key: `stack-${i}`, w: 96, h: 96, children: layers };
+  const name = text(`name-${i}`, entry.name, entry.name, { style: "caption", textAlign: "center", maxLines: 1, ...installed ? {} : { color: "muted" } });
+  const tile = { type: "Column", key: `tile-${i}`, gap: 4, crossAxisAlignment: "center", children: [icon, name] };
+  if (installed && !editing && !heart) {
+    return { type: "Card", key: `card-${i}`, variant: "plain", flush: true, onTap: { go: { plugin: { repo: entry.repo } } }, children: [tile] };
+  }
+  return { ...tile, key: `card-${i}` };
 }
-var FILTERS = ["all", "installed", "missing"];
-var filterOf = (state) => state && FILTERS.includes(state.filter) ? state.filter : "all";
-var grid = (key, cards) => ({ type: "GridView", key, columns: { compact: 2, medium: 3, expanded: 4 }, gap: 8, children: cards });
+var grid = (key, tiles) => ({ type: "GridView", key, columns: { compact: 3, medium: 4, expanded: 6 }, gap: 16, children: tiles });
 function pageView({ state }) {
   const st = state && state.mp;
   const nodes = [];
+  nodes.push({
+    type: "TextField",
+    key: "dvSearch",
+    kind: "search",
+    maxLength: 200,
+    hintText: "Buscar película o serie",
+    hintTextEn: "Search a movie or a series",
+    onSubmitted: "search",
+    trailingIcon: "search",
+    trailingLabel: "Buscar",
+    trailingLabelEn: "Search",
+    onTrailingTap: "search"
+  });
   if (state && Array.isArray(state.notice)) nodes.push(text("notice", state.notice[0], state.notice[1], { color: "primary" }));
   if (!st) return [...nodes, { type: "Skeleton", key: "loading", shape: "block", height: 160 }];
   if (!st.ok) {
@@ -969,51 +963,35 @@ function pageView({ state }) {
       { type: "ElevatedButton", key: "enableAuto", icon: "sync", ...label("Activar", "Turn on"), onPressed: { event: "enableAuto" } }
     ] }] });
   }
-  nodes.unshift({
-    type: "TextField",
-    key: "dvSearch",
-    kind: "search",
-    maxLength: 200,
-    hintText: "Buscar película o serie",
-    hintTextEn: "Search a movie or a series",
-    onSubmitted: "search",
-    trailingIcon: "search",
-    trailingLabel: "Buscar",
-    trailingLabelEn: "Search",
-    onTrailingTap: "search"
-  });
-  const lastOf = (repo) => (st.lastResult || []).find((r) => r && r.repo === repo);
-  const filter = filterOf(state);
-  nodes.push({ type: "Row", key: "pluginsHead", gap: 8, crossAxisAlignment: "center", children: [
-    text("mineTitle", "Tus plugins", "Your plugins", { style: "h4" }),
-    { type: "TextButton", key: "checkNow", icon: "refresh", ...label(st.running ? "Actualizando…" : "Buscar actualizaciones", st.running ? "Updating…" : "Check for updates"), onPressed: { event: "checkNow" } }
-  ] });
-  nodes.push({ type: "Chips", key: "filter", value: filter, onChange: { event: "filter" }, options: [
-    { value: "all", label: "Todos", labelEn: "All" },
-    { value: "installed", label: "Instalados", labelEn: "Installed" },
-    { value: "missing", label: "No instalados", labelEn: "Not installed" }
-  ] });
+  const editing = !!(state && state.editing);
   const all = [RESOLVER, ...PLUGINS];
   const installed = all.filter((p) => st.plugins[p.repo]);
   const missing = all.filter((p) => !st.plugins[p.repo]);
-  const shown = filter === "installed" ? installed : filter === "missing" ? missing : [...installed, ...missing];
-  if (!shown.length) {
-    nodes.push(text(
-      "emptyFilter",
-      filter === "installed" ? "Todavía no tienes ninguno instalado." : "Ya los tienes todos.",
-      filter === "installed" ? "You have none installed yet." : "You have them all.",
-      { color: "muted" }
-    ));
-  } else {
-    nodes.push(grid("pluginsGrid", shown.map((p) => pluginCard(p, st.plugins[p.repo] || null, lastOf(p.repo), all.indexOf(p), { heart: p === RESOLVER }))));
+  const updates = installed.filter((p) => st.plugins[p.repo].available).length;
+  nodes.push({ type: "Row", key: "mineHead", gap: 4, crossAxisAlignment: "center", children: [
+    text("mineTitle", "Tus plugins", "Your plugins", { style: "h5", weight: 1 }),
+    iconBtn(
+      "checkNow",
+      "refresh",
+      st.running ? "Actualizando…" : updates ? `Actualizar ${updates}` : "Buscar actualizaciones",
+      st.running ? "Updating…" : updates ? `Update ${updates}` : "Check for updates",
+      { event: "checkNow" }
+    ),
+    ...installed.length > 1 ? [{ type: "TextButton", key: "editToggle", ...label(editing ? "Listo" : "Editar", editing ? "Done" : "Edit"), onPressed: { event: "toggleEdit" } }] : []
+  ] });
+  if (installed.length) nodes.push(grid("mineGrid", installed.map((p) => pluginTile(p, st.plugins[p.repo], all.indexOf(p), { heart: p === RESOLVER, editing }))));
+  else nodes.push(text("mineEmpty", "Todavía no tienes ninguno. Instala uno de abajo.", "You don't have any yet. Install one below.", { color: "muted" }));
+  if (missing.length) {
+    nodes.push(text("missingTitle", "Para instalar", "To install", { style: "h5" }));
+    nodes.push(grid("missingGrid", missing.map((p) => pluginTile(p, null, all.indexOf(p), { heart: p === RESOLVER }))));
   }
   nodes.push(text(
     "autoText",
     `Da-Video revisa tus plugins de ${OWNER} cada 4 horas. Cámbialo en Ajustes ▸ Plugins ▸ Da-Video.`,
     `Da-Video checks your ${OWNER} plugins every 4 hours. Change it in Settings ▸ Plugins ▸ Da-Video.`,
-    { color: "muted" }
+    { style: "caption", color: "muted" }
   ));
-  return [{ type: "Column", key: "dvPage", crossAxisAlignment: "stretch", padding: { compact: 12, expanded: 24 }, gap: 12, children: nodes }];
+  return [{ type: "Column", key: "dvPage", crossAxisAlignment: "stretch", padding: { compact: 16, expanded: 24 }, gap: 16, children: nodes }];
 }
 var pageEvery = ({ state }) => ({ ms: state && state.busy ? POLL_MS2 : IDLE_POLL_MS, event: "refresh" });
 
