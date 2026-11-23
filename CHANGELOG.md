@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.2
+
+- The plugin sheet: its name as the title with the close X at the top, Desinstalar and Abrir side by side, no icons
+
 ## 0.3.1
 
 - A tap on one of your plugins opens a sheet: Abrir, Actualizar when a new version waits, Configurar when it needs it, and Desinstalar below (no Editar mode)

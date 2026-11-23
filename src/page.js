@@ -160,22 +160,29 @@ const grid = (key, tiles) => ({ type: "GridView", key, columns: { compact: 3, me
 function pluginSheet(state, st) {
   const entry = state && state.pick ? [RESOLVER, ...PLUGINS].find((p) => p.repo === state.pick) : null;
   const row = entry ? st.plugins[entry.repo] : null;
-  const children = entry && row ? [
-    { type: "Row", key: "sheetHead", gap: 12, crossAxisAlignment: "center", children: [
-      { type: "Image", key: "sheetIcon", url: iconOf(entry), w: 48, h: 48, radius: "medium", fit: "cover" },
-      { type: "Column", key: "sheetTitle", gap: 4, children: [
-        text("sheetName", entry.name, entry.name, { style: "h5" }),
-        text("sheetVer", row.available ? `v${row.version} · hay una nueva: v${row.available}` : `v${row.version}`,
-          row.available ? `v${row.version} · a new one: v${row.available}` : `v${row.version}`, { style: "caption", color: "muted" }),
-      ] },
+  if (!entry || !row) return { type: "BottomSheet", key: "pluginSheet", onClose: "unpick", children: [text("sheetEmpty", "…", "…", { color: "muted" })] };
+  // Two equal buttons side by side, no icons.
+  const pair = (key, buttons) => ({ type: "Row", key, gap: 12, children: buttons.map((b) => ({ ...b, weight: 1 })) });
+  const extra = [];
+  if (row.available) extra.push({ type: "Button", key: "sheetUpdate", variant: "secondary", ...label(`Actualizar a v${row.available}`, `Update to v${row.available}`), onPressed: { event: "updateOne", arg: entry.repo } });
+  if (entry.setup && row.setupReady === false && !row.setupRunning) extra.push({ type: "Button", key: "sheetSetup", variant: "secondary", ...label("Configurar", "Set up"), onPressed: { event: "setupPlugin", arg: entry.repo } });
+  const main = [
+    ...(entry !== RESOLVER ? [{ type: "Button", key: "sheetUninstall", variant: "secondary", ...label("Desinstalar", "Uninstall"), onPressed: { go: { uninstallPlugin: { repo: entry.repo } } } }] : []),
+    { type: "ElevatedButton", key: "sheetOpen", ...label("Abrir", "Open"), onPressed: { go: { plugin: { repo: entry.repo } } } },
+  ];
+  const children = [
+    { type: "Row", key: "sheetHead", gap: 16, crossAxisAlignment: "center", children: [
+      { type: "Image", key: "sheetIcon", url: iconOf(entry), w: 64, h: 64, radius: "large", fit: "cover" },
+      text("sheetVer", row.available ? `Versión ${row.version} · hay una nueva` : `Versión ${row.version}`,
+        row.available ? `Version ${row.version} · a new one is out` : `Version ${row.version}`, { color: "muted" }),
     ] },
-    { type: "ElevatedButton", key: "sheetOpen", icon: "open_in_new", ...label("Abrir", "Open"), onPressed: { go: { plugin: { repo: entry.repo } } } },
-    ...(row.available ? [{ type: "Button", key: "sheetUpdate", variant: "secondary", icon: "refresh", ...label(`Actualizar a v${row.available}`, `Update to v${row.available}`), onPressed: { event: "updateOne", arg: entry.repo } }] : []),
-    ...(entry.setup && row.setupReady === false && !row.setupRunning ? [{ type: "Button", key: "sheetSetup", variant: "secondary", icon: "settings", ...label("Configurar", "Set up"), onPressed: { event: "setupPlugin", arg: entry.repo } }] : []),
     ...(entry.setup && row.setupRunning ? [text("sheetSetupRun", "Configurándose…", "Setting up…", { color: "muted" })] : []),
-    ...(entry !== RESOLVER ? [{ type: "TextButton", key: "sheetUninstall", icon: "delete", ...label("Desinstalar", "Uninstall"), color: "error", onPressed: { go: { uninstallPlugin: { repo: entry.repo } } } }] : []),
-  ] : [text("sheetEmpty", "…", "…", { color: "muted" })];
-  return { type: "BottomSheet", key: "pluginSheet", onClose: "unpick", children: [{ type: "Column", key: "sheetBody", gap: 12, crossAxisAlignment: "stretch", padding: 16, children }] };
+    ...(extra.length ? [pair("sheetExtra", extra)] : []),
+    pair("sheetMain", main),
+  ];
+  // With a title, Kino puts its own X at the end of the title row, at the top.
+  return { type: "BottomSheet", key: "pluginSheet", title: entry.name, titleEn: entry.name, onClose: "unpick",
+    children: [{ type: "Column", key: "sheetBody", gap: 16, crossAxisAlignment: "stretch", padding: 16, children }] };
 }
 
 /** The page's nodes (std's `page.view`). */
