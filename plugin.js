@@ -1231,10 +1231,19 @@ var pageEvery = ({ state }) => state && state.contentLoading ? { ms: 1e3, event:
 
 // src/plugin.js
 var MINE = "mine";
+var SEARCH_FIRST = ["xuper-plugin/kino-plugin-hdfull", "xuper-plugin/kino-plugin-movieplus", "xuper-plugin/kino-plugin-xuper", "xuper-plugin/kino-plugin-zapptv"];
+function searchRank(repo) {
+  const key = String(repo || "").toLowerCase();
+  const first = SEARCH_FIRST.indexOf(key);
+  if (first >= 0) return first;
+  const i = PLUGINS.findIndex((p) => p.repo.toLowerCase() === key);
+  return SEARCH_FIRST.length + (i >= 0 ? i : PLUGINS.length);
+}
 async function sources() {
   const kino = globalThis.kino;
   if (!kino || !kino.plugins || typeof kino.plugins.providers !== "function") return [];
-  return (await kino.plugins.providers(MINE)).map((p) => ({ repo: p.repo, name: p.name }));
+  const all = (await kino.plugins.providers(MINE)).map((p) => ({ repo: p.repo, name: p.name }));
+  return all.sort((a, b) => searchRank(a.repo) - searchRank(b.repo));
 }
 async function searchIn(q, repos) {
   const all = await globalThis.kino.plugins.callAll(MINE, "search", { q }, { only: repos });
@@ -1285,7 +1294,9 @@ async function job(ctx) {
   return null;
 }
 export {
+  SEARCH_FIRST,
   job,
   screen,
-  screenEvent
+  screenEvent,
+  searchRank
 };

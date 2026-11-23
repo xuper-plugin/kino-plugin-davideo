@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.8
+
+- Search: HDFull, Movie+, Xuper and ZappTV come first when you have them on, then the rest in the catalog's order.
+
 ## 0.4.7
 
 - After Desinstalar the plugin's sheet closes by itself and says «Se desinstaló …».

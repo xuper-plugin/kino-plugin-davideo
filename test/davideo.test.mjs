@@ -319,3 +319,18 @@ test("after Desinstalar the sheet closes by itself and says so", async () => {
   installed = true;
   assert.ok(!(await p.screenEvent({ name: "refresh", state: st })).ui);
 });
+
+test("search: HDFull, Movie+, Xuper and ZappTV first (when on), then the catalog's order", async () => {
+  const kino = fakeKino();
+  kino.plugins.providers = async () => [
+    { repo: SERIESFLIX, name: "Seriesflix" },
+    { repo: "xuper-plugin/kino-plugin-zapptv", name: "ZappTV" },
+    { repo: "xuper-plugin/kino-plugin-serieskao", name: "SeriesKao" },
+    { repo: HDFULL, name: "HDFull" },
+    { repo: "xuper-plugin/kino-plugin-xuper", name: "Xuper" },
+  ];
+  const p = await load(kino);
+  const { searchRank } = p;
+  const order = (await kino.plugins.providers()).map((x) => x.repo).sort((a, b) => searchRank(a) - searchRank(b));
+  assert.deepEqual(order, [HDFULL, "xuper-plugin/kino-plugin-xuper", "xuper-plugin/kino-plugin-zapptv", SERIESFLIX, "xuper-plugin/kino-plugin-serieskao"]);
+});
