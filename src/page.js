@@ -118,7 +118,7 @@ const iconBtn = (key, icon, es, en, onPressed) => ({ type: "IconButton", key, ic
 
 /**
  * One compact card of the grid: the icon on top (a tap on an installed card opens the plugin), the name, then icon-only buttons:
- * uninstall on the left and open on the right when installed (the heart, Kino Resolver, has neither), download when not.
+ * uninstall (and update or set up when it needs it) when installed, the heart (Kino Resolver) never uninstalled, download when not.
  */
 function pluginCard(entry, row, last, i, { heart = false } = {}) {
   const installed = !!row;
@@ -144,7 +144,6 @@ function pluginCard(entry, row, last, i, { heart = false } = {}) {
     if (!heart) buttons.push(iconBtn(`uninstall-${i}`, "delete", `Desinstalar ${entry.name}`, `Uninstall ${entry.name}`, { go: { uninstallPlugin: { repo: entry.repo } } }));
     if (row.available) buttons.push(iconBtn(`update-${i}`, "refresh", `Actualizar ${entry.name}`, `Update ${entry.name}`, { event: "updateOne", arg: entry.repo }));
     if (entry.setup && row.setupReady === false && !row.setupRunning) buttons.push(iconBtn(`setup-${i}`, "settings", `Configurar ${entry.name}`, `Set up ${entry.name}`, { event: "setupPlugin", arg: entry.repo }));
-    if (!heart) buttons.push(iconBtn(`open-${i}`, "open_in_new", `Abrir ${entry.name}`, `Open ${entry.name}`, { go: { plugin: { repo: entry.repo } } }));
   }
   return {
     type: "Card", key: `card-${i}`,

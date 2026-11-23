@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.3
+
+- No open button: a tap on the card opens the plugin
+
 ## 0.2.2
 
 - Two cards per row on a phone; the search field's button is a search icon

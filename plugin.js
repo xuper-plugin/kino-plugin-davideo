@@ -929,7 +929,6 @@ function pluginCard(entry, row, last, i, { heart = false } = {}) {
     if (!heart) buttons.push(iconBtn(`uninstall-${i}`, "delete", `Desinstalar ${entry.name}`, `Uninstall ${entry.name}`, { go: { uninstallPlugin: { repo: entry.repo } } }));
     if (row.available) buttons.push(iconBtn(`update-${i}`, "refresh", `Actualizar ${entry.name}`, `Update ${entry.name}`, { event: "updateOne", arg: entry.repo }));
     if (entry.setup && row.setupReady === false && !row.setupRunning) buttons.push(iconBtn(`setup-${i}`, "settings", `Configurar ${entry.name}`, `Set up ${entry.name}`, { event: "setupPlugin", arg: entry.repo }));
-    if (!heart) buttons.push(iconBtn(`open-${i}`, "open_in_new", `Abrir ${entry.name}`, `Open ${entry.name}`, { go: { plugin: { repo: entry.repo } } }));
   }
   return {
     type: "Card",
