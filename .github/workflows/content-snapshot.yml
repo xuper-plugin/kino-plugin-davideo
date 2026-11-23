@@ -1,0 +1,29 @@
+# Da-Video's shared Home (home/content.json): every 6 hours, half an hour after the plugins' own Home snapshots (minute 23),
+# from their ready copies. Commits as xuper-plugin, and only when the Home changed.
+name: Content snapshot
+on:
+  schedule:
+    - cron: "53 */6 * * *"
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: content-snapshot
+  cancel-in-progress: false
+jobs:
+  content:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node scripts/content-snapshot.mjs
+      - name: Commit the shared Home
+        run: |
+          git add home
+          if git diff --cached --quiet; then echo "Home unchanged"; exit 0; fi
+          git -c user.name=xuper-plugin -c user.email=335105665+xuper-plugin@users.noreply.github.com commit -q -m "Shared Home"
+          git pull -q --rebase origin main
+          git push -q origin HEAD:main

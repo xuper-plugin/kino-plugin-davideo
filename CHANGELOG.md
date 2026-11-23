@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.1
+
+- Contenido opens from one shared file: this repository's Action merges every plugin's ready Home into home/content.json every 6 hours; the device makes one request and keeps the titles of the plugins you installed.
+
 ## 0.4.0
 
 - Contenido: a second tab, shown once one of your plugins with a ready Home is installed: a slider and rows by category (new releases, popular, series, anime, dramas, kids, genres) from the ready copies of your installed plugins, one card per title; each card opens and plays in its own plugin.

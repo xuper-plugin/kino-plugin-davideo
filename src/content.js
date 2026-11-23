@@ -1,26 +1,22 @@
 // Contenido (owner, 2026-11-23): a streaming-style Home made from the ready copies of the person's installed plugins. Each
 // plugin repository keeps its screen's tabs in home/<tab>.json (and their list in home/index.json), refreshed every 6 hours by
-// its own GitHub Action; Da-Video fetches those of the plugins the person has installed, merges the same title found by several
-// plugins into one card (the plugin first in Da-Video's order keeps it), sorts the rows into fixed categories and puts a slider
-// on top. Every card carries its `origin`: Kino opens and plays it in the plugin it came from (Kino's plugin federation).
+// its own GitHub Action. This repository's Action (scripts/content-snapshot.mjs, every 6 hours, after theirs) merges them all
+// into one shared Home, home/content.json: one card per title with every plugin that has it, rows by category (buildShared).
+// The device makes one request and keeps, for each card, the first copy whose plugin the person installed (pickForInstalled),
+// then puts a slider on top. Every card carries its `origin`: Kino opens and plays it in that plugin (Kino's plugin federation).
 import { PLUGINS } from "./catalog.js";
 
 const k = () => globalThis.kino;
 
 export const RAW_HOST = "raw.githubusercontent.com";
-const fileUrl = (repo, name) => `https://${RAW_HOST}/${repo}/main/home/${encodeURIComponent(name)}.json`;
 
 export const CACHE_KEY = "dv:content:v1";
 /** A kept Home younger than this opens as it is; older, it is shown at once and fetched again behind it. */
 export const FRESH_MS = 30 * 60 * 1000;
-/** A plugin's file older than this is left out (its Action stopped): the plugin's own screen still scrapes its site. */
-const FILE_MAX_AGE_MS = 48 * 60 * 60 * 1000;
-const TABS_PER_PLUGIN = 3;
 const PER_CATEGORY = 30;
 const MIN_PER_CATEGORY = 4;
 export const MAX_SLIDES = 8;
 const FETCH_MS = 7000;
-const BATCH = 8;
 
 /**
  * The categories, in the order they are drawn. A source row lands in the first whose `match` its folded title passes (or whose
@@ -64,61 +60,86 @@ export function categoryOf(row, pluginKind) {
 }
 
 /**
- * The Home from the sources, in Da-Video's order: `[{ repo, kind, rows }]` (rows as the plugins' files hold them, hidden rows
- * included). One card per title (folded title + kind): the first plugin that has it keeps it, the others fill what it lacks
- * (poster, backdrop, synopsis, year, TMDB id). Each category mixes its rows' cards in turn, at most PER_CATEGORY, and is left out
- * under MIN_PER_CATEGORY. The slides: the drawn cards with a backdrop, a synopsis first, one plugin after another. Pure.
+ * The shared Home (home/content.json, written by this repository's Action from every plugin's ready copies): the sources in
+ * Da-Video's order, `[{ repo, kind, rows }]` (rows as the plugins' files hold them, hidden rows included). One card per title
+ * (folded title + kind) with every plugin that has it in `copies` (`{ origin, ref, id }`, Da-Video's order), the first copy
+ * lending the card its pictures and the others filling what it lacks. Each category mixes its rows' cards in turn, at most
+ * SHARED_PER_CATEGORY (the device keeps the ones whose plugin the person installed). Pure.
  */
-export function buildContent(sources) {
-  const chosen = new Map(); // title key -> card
-  const cardOf = (item, src, n) => {
+export const SHARED_PER_CATEGORY = 60;
+export function buildShared(sources, now = Date.now()) {
+  const chosen = new Map();
+  const cardOf = (item, src) => {
     if (!item || typeof item.ref !== "string" || typeof item.title !== "string" || !item.title.trim() || item.adult === true) return null;
     const key = fold(item.title) + "|" + kindOf(item);
+    const copy = { origin: src.repo, ref: item.ref, id: String(item.id || item.ref).slice(0, 100) };
     const have = chosen.get(key);
     if (have) {
+      if (!have.copies.some((c) => c.origin === copy.origin)) have.copies.push(copy);
       for (const f of ["poster", "backdrop", "overview", "rating"]) if (have[f] == null && item[f] != null) have[f] = item[f];
       if (!have.year && year4(item.year)) have.year = year4(item.year);
-      if (!(have.ids && have.ids.tmdb) && item.ids && item.ids.tmdb) have.ids = { ...(have.ids || {}), tmdb: item.ids.tmdb };
+      if (!(have.ids && have.ids.tmdb) && item.ids && item.ids.tmdb) have.ids = { tmdb: item.ids.tmdb };
       return have;
     }
     const card = {
-      id: (n + "~" + String(item.id || item.ref)).slice(0, 128), ref: item.ref, title: item.title.trim(), kind: kindOf(item),
-      ...(year4(item.year) ? { year: year4(item.year) } : {}),
+      key, title: item.title.trim(), kind: kindOf(item), ...(year4(item.year) ? { year: year4(item.year) } : {}),
       ...(item.poster ? { poster: item.poster } : {}), ...(item.backdrop ? { backdrop: item.backdrop } : {}),
-      ...(item.overview ? { overview: String(item.overview) } : {}), ...(typeof item.rating === "number" ? { rating: item.rating } : {}),
+      ...(item.overview ? { overview: String(item.overview).slice(0, 300) } : {}), ...(typeof item.rating === "number" ? { rating: item.rating } : {}),
       ...(item.ids && item.ids.tmdb ? { ids: { tmdb: item.ids.tmdb } } : {}),
-      origin: src.repo,
+      copies: [copy],
     };
     chosen.set(key, card);
     return card;
   };
-  const byCategory = new Map(); // category -> [[cards of one row], ...]
-  sources.forEach((src, n) => {
+  const byCategory = new Map();
+  for (const src of sources) {
     for (const row of src.rows || []) {
       if (!row || !Array.isArray(row.items)) continue;
-      const cards = row.items.map((i) => cardOf(i, src, n)).filter(Boolean);
+      const cards = row.items.map((i) => cardOf(i, src)).filter(Boolean);
       if (row.hidden || cards.length === 0) continue; // a plugin's own slider row only lends its pictures
       const cat = categoryOf(row, src.kind);
       if (!byCategory.has(cat)) byCategory.set(cat, []);
       byCategory.get(cat).push(cards);
     }
-  });
+  }
   const rails = [];
   for (const id of DRAW_ORDER) {
     const queues = (byCategory.get(id) || []).map((q) => q.slice());
     const out = [];
     const seen = new Set();
-    while (out.length < PER_CATEGORY && queues.some((q) => q.length)) {
+    while (out.length < SHARED_PER_CATEGORY && queues.some((q) => q.length)) {
       for (const q of queues) {
         const c = q.shift();
-        if (c && !seen.has(c.id) && out.length < PER_CATEGORY) { seen.add(c.id); out.push(c); }
+        if (c && !seen.has(c.key) && out.length < SHARED_PER_CATEGORY) { seen.add(c.key); out.push(c); }
       }
     }
-    if (out.length < MIN_PER_CATEGORY) continue;
+    if (out.length === 0) continue;
     const cat = CATEGORIES.find((c) => c.id === id) || MORE;
-    rails.push({ id, title: cat.es, titleEn: cat.en, items: out });
+    // A synopsis only where the card can be a slide (it has a backdrop), cut short: the file stays small.
+    rails.push({ id, title: cat.es, titleEn: cat.en, items: out.map(({ key, overview, ...rest }) => (rest.backdrop && overview ? { ...rest, overview: overview.slice(0, 160) } : rest)) });
   }
-  // The slider: cards that are drawn (Kino finds a slide's card on the screen and opens it in its origin), one plugin after another.
+  return { v: 1, at: now, rails };
+}
+
+/**
+ * The person's Home from the shared one: each card opens in the first of its copies whose plugin is installed ([installed]: repos,
+ * Da-Video's order), cards with none are left out, at most PER_CATEGORY per row and rows under MIN_PER_CATEGORY dropped. The
+ * slides: drawn cards with a backdrop (a synopsis first), one plugin after another. Rails draw posters only. Pure.
+ */
+export function pickForInstalled(shared, installed) {
+  const order = new Map(installed.map((r, i) => [r, i]));
+  const rails = [];
+  for (const r of (shared && Array.isArray(shared.rails) ? shared.rails : [])) {
+    const items = [];
+    for (const c of Array.isArray(r.items) ? r.items : []) {
+      if (items.length >= PER_CATEGORY) break;
+      const copy = (Array.isArray(c.copies) ? c.copies : []).filter((x) => order.has(x.origin)).sort((a, b) => order.get(a.origin) - order.get(b.origin))[0];
+      if (!copy || typeof copy.ref !== "string") continue;
+      const { copies, ...rest } = c;
+      items.push({ ...rest, id: (order.get(copy.origin) + "~" + copy.id).slice(0, 128), ref: copy.ref, origin: copy.origin });
+    }
+    if (items.length >= MIN_PER_CATEGORY) rails.push({ id: r.id, title: r.title, titleEn: r.titleEn, items });
+  }
   const drawn = [...new Map(rails.flatMap((r) => r.items).map((c) => [c.id, c])).values()].filter((c) => /^https:\/\//.test(c.backdrop || ""));
   drawn.sort((a, b) => (b.overview ? 1 : 0) - (a.overview ? 1 : 0));
   const slides = [];
@@ -131,8 +152,12 @@ export function buildContent(sources) {
       slides.push(c);
     }
   }
-  // Rails draw posters: a backdrop on only some cards would turn a rail wide (Kino draws a card with one wide).
   return { slides, rails: rails.map((r) => ({ ...r, items: r.items.map(({ backdrop, overview, ...rest }) => rest) })) };
+}
+
+/** buildShared then pickForInstalled with every source installed (the tests and the Action's summary). Pure. */
+export function buildContent(sources) {
+  return pickForInstalled(buildShared(sources), sources.map((s) => s.repo));
 }
 
 /** The installed plugins whose repository keeps a ready Home, in Da-Video's order (`st`: loadStatus()'s answer). */
@@ -160,37 +185,21 @@ export function contentStale(repos, now = Date.now()) {
   return now - Number(c.at) > FRESH_MS;
 }
 
-async function getJson(url) {
-  try {
-    const r = await k().fetch(url, { timeoutMs: FETCH_MS });
-    if (!r || !r.ok) return null;
-    return JSON.parse(await r.text());
-  } catch (_) { return null; }
-}
+/** Where this repository's Action keeps the shared Home. */
+export const SHARED_URL = `https://${RAW_HOST}/xuper-plugin/kino-plugin-davideo/main/home/content.json`;
+/** A shared Home older than this is not used (the Action stopped): Contenido says it has nothing yet. */
+const SHARED_MAX_AGE_MS = 48 * 60 * 60 * 1000;
 
-async function inBatches(list, fn) {
-  const out = [];
-  for (let i = 0; i < list.length; i += BATCH) out.push(...(await Promise.all(list.slice(i, i + BATCH).map(fn))));
-  return out;
-}
-
-/** Fetches the files of [plugins] (their index, then their first TABS_PER_PLUGIN tabs), builds the Home and keeps it. */
+/** One request: the shared Home, kept for the installed [plugins] only. */
 export async function loadContent(plugins, now = Date.now()) {
-  const indexes = await inBatches(plugins, (p) => getJson(fileUrl(p.repo, "index")));
-  const wanted = [];
-  plugins.forEach((p, i) => {
-    const tabs = indexes[i] && Array.isArray(indexes[i].tabs) ? indexes[i].tabs.map((t) => t && t.id).filter((x) => typeof x === "string") : [];
-    for (const id of tabs.slice(0, TABS_PER_PLUGIN)) wanted.push({ p, id });
-  });
-  const files = await inBatches(wanted, (w) => getJson(fileUrl(w.p.repo, w.id)));
-  const rowsOf = new Map(plugins.map((p) => [p.repo, []]));
-  wanted.forEach((w, i) => {
-    const f = files[i];
-    if (!f || f.tab !== w.id || !Array.isArray(f.rows) || now - Number(f.at) > FILE_MAX_AGE_MS) return;
-    rowsOf.get(w.p.repo).push(...f.rows);
-  });
-  const built = buildContent(plugins.map((p) => ({ repo: p.repo, kind: p.kind, rows: rowsOf.get(p.repo) })));
-  memo = { at: now, repos: plugins.map((p) => p.repo), ...built };
+  let shared = null;
+  try {
+    const r = await k().fetch(SHARED_URL, { timeoutMs: FETCH_MS });
+    if (r && r.ok) shared = JSON.parse(await r.text());
+  } catch (_) { /* offline: the kept Home stays */ }
+  if (!shared || shared.v !== 1 || !Array.isArray(shared.rails) || now - Number(shared.at) > SHARED_MAX_AGE_MS) return keptContent();
+  const repos = plugins.map((p) => p.repo);
+  memo = { at: now, repos, ...pickForInstalled(shared, repos) };
   try { k().storage.set(CACHE_KEY, JSON.stringify(memo)); } catch (_) { /* full storage: kept in memory only */ }
   return memo;
 }

@@ -170,7 +170,7 @@ test("the sheet of a plugin that needs the resolver, while the resolver is missi
 });
 
 // ---- Contenido ----
-import { buildContent, categoryOf, MAX_SLIDES } from "../src/content.js";
+import { buildContent, buildShared, categoryOf, MAX_SLIDES } from "../src/content.js";
 
 const card = (n, extra = {}) => ({ id: "i" + n, ref: "r:" + n, title: "Title " + n, kind: "movie", poster: "https://p/" + n + ".jpg", ...extra });
 
@@ -209,12 +209,12 @@ test("Contenido: a row's category by its title, else its plugin's kind", () => {
 
 test("Contenido: the tab shows once a plugin with a ready Home is installed, built from the repositories' files", async () => {
   const now = Date.now();
-  const files = {
-    "xuper-plugin/kino-plugin-seriesflix/main/home/index.json": { v: 1, tabs: [{ id: "series" }] },
-    "xuper-plugin/kino-plugin-seriesflix/main/home/series.json": { v: 1, tab: "series", at: now, rows: [
-      { id: "p", title: "Series populares", items: [card(1, { kind: "series", backdrop: "https://b/1.jpg", overview: "x" }), card(2, { kind: "series" }), card(3, { kind: "series" }), card(4, { kind: "series" })] },
-    ] },
-  };
+  // The shared Home (this repository's Action) holds two plugins' copies; only Seriesflix is installed here.
+  const shared = buildShared([
+    { repo: "xuper-plugin/kino-plugin-serieskao", kind: "series", rows: [{ id: "x", title: "Series populares", items: [card(1, { kind: "series", ref: "sk:1" })] }] },
+    { repo: "xuper-plugin/kino-plugin-seriesflix", kind: "series", rows: [{ id: "p", title: "Series populares", items: [card(1, { kind: "series", backdrop: "https://b/1.jpg", overview: "x" }), card(2, { kind: "series" }), card(3, { kind: "series" }), card(4, { kind: "series" })] }] },
+  ], now);
+  const files = { "xuper-plugin/kino-plugin-davideo/main/home/content.json": shared };
   const kino = fakeKino();
   kino.fetch = async (url) => {
     const f = files[String(url).replace("https://raw.githubusercontent.com/", "")];
@@ -229,7 +229,8 @@ test("Contenido: the tab shows once a plugin with a ready Home is installed, bui
   const t = await p.screen({ state: { ...o.state, ...sw.state }, device: "phone", installed: {} });
   const rail = byKey(t, "dvrail-series");
   assert.equal(rail.items.length, 4);
-  assert.equal(rail.items[0].origin, "xuper-plugin/kino-plugin-seriesflix");
+  assert.equal(rail.items[0].origin, "xuper-plugin/kino-plugin-seriesflix", "the installed copy, not SeriesKao's");
+  assert.equal(rail.items[0].ref, "r:1");
   assert.ok(byKey(t, "dvslide-" + rail.items[0].id), "the slide is the rail's card");
   assert.ok(!byKey(t, "mineGrid"), "Contenido replaces the plugins grid");
   assert.deepEqual(kit.checkScreenTree(fold(t), "es", undefined, { apiVersion: 31 }).dropped, []);
