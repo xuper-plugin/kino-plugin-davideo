@@ -1098,14 +1098,14 @@ function pageView({ state }) {
   if (!st) return [...nodes, { type: "Skeleton", key: "loading", shape: "block", height: 160 }];
   lastStatus = st;
   if (contentPlugins(st).length > 0) {
-    const tab = state.dvTab === "content" ? "content" : "mine";
+    const tab = state.dvTab === "mine" ? "mine" : "content";
     nodes.push({
       type: "TabBar",
       key: "dvTabs",
       divider: false,
       value: tab,
       onChanged: "dvTab",
-      tabs: [{ value: "mine", label: "Mis plugins", labelEn: "My plugins" }, { value: "content", label: "Contenido", labelEn: "Content" }]
+      tabs: [{ value: "content", label: "Contenido", labelEn: "Content" }, { value: "mine", label: "Mis plugins", labelEn: "My plugins" }]
     });
     if (tab === "content") {
       nodes.push(...contentView(keptContent(), state.contentLoading === true));

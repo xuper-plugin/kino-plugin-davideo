@@ -63,6 +63,7 @@ test("the page (design C): home-screen icons, yours then the ones to install, Ed
   const kino = fakeKino();
   const p = await load(kino);
   const o = await p.screenEvent({ name: "open", state: {}, device: "phone", route: { name: "main" } });
+  o.state.dvTab = "mine"; // Contenido is the default tab: these checks are on Mis plugins
   const tree = await p.screen({ state: o.state, device: "phone", installed: {} });
   // The search field on top; no search icon in the bar; the back arrow instead of the X.
   assert.equal(byKey(tree, "dvSearch").type, "TextField");
@@ -155,6 +156,7 @@ test("the sheet of a plugin that needs the resolver, while the resolver is missi
   ], running: false, lastRun: null, lastResult: [] } });
   const p = await load(kino);
   const o = await p.screenEvent({ name: "open", state: {}, device: "phone", route: { name: "main" } });
+  o.state.dvTab = "mine"; // Contenido is the default tab: these checks are on Mis plugins
   const ps = await p.screenEvent({ name: "pick", arg: SERIESFLIX, state: o.state });
   const t = await p.screen({ state: { ...o.state, ...ps.state }, device: "phone", installed: {} });
   assert.ok(!byKey(t, "sheetOpen"));
@@ -223,7 +225,7 @@ test("Contenido: the tab shows once a plugin with a ready Home is installed, bui
   const p = await load(kino);
   const o = await p.screenEvent({ name: "open", state: {}, device: "phone", route: { name: "main" } });
   const mine = await p.screen({ state: o.state, device: "phone", installed: {} });
-  assert.equal(byKey(mine, "dvTabs").value, "mine");
+  assert.equal(byKey(mine, "dvTabs").value, "content", "Contenido is first and shown by default");
   await p.screenEvent({ name: "contentLoad", state: o.state });
   const sw = await p.screenEvent({ name: "dvTab", value: "content", state: o.state });
   const t = await p.screen({ state: { ...o.state, ...sw.state }, device: "phone", installed: {} });

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.4
+
+- Contenido is the first tab and opens by default when one of your plugins keeps a ready Home.
+
 ## 0.4.3
 
 - A Contenido Home kept without a slider (a lagging copy of the shared file) is asked again after 2 minutes.
