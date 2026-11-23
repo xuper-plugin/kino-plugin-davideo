@@ -65,25 +65,32 @@ test("the page: the heart with its update, the person's plugins with what each n
   const p = await load(kino);
   const o = await p.screenEvent({ name: "open", state: {}, device: "phone", route: { name: "main" } });
   const tree = await p.screen({ state: o.state, device: "phone", installed: {} });
-  assert.ok(byKey(tree, "heartTitle"));
+  // The search field on top, Google-like; no search icon in the bar, and the back arrow instead of the X.
+  assert.equal(byKey(tree, "dvSearch").type, "TextField");
+  assert.ok(!byKey(tree, "searchButton"));
+  assert.equal(byKey(tree, "close").icon, "arrow_back");
+  // The heart is the grid's first card, with no open or uninstall button.
+  assert.ok(!byKey(tree, "uninstall-0") && !byKey(tree, "open-0"));
   assert.deepEqual(byKey(tree, "update-0").onPressed, { event: "updateOne", arg: RESOLVER });
   // HDFull is installed and needs its setup: Configurar.
   // Installed cards carry the green edge (success) and an Uninstall button; the resolver is one of them.
   const green = nodes(tree).filter((n) => n.type === "Card" && n.border && n.border.color === "success");
   assert.equal(green.length, 3);
   assert.ok(nodes(tree).some((n) => n.onPressed && n.onPressed.go && n.onPressed.go.uninstallPlugin && n.onPressed.go.uninstallPlugin.repo === HDFULL));
-  assert.ok(nodes(tree).some((n) => n.type === "ElevatedButton" && n.onPressed && n.onPressed.event === "setupPlugin" && n.onPressed.arg === HDFULL));
+  assert.ok(nodes(tree).some((n) => n.type === "IconButton" && n.onPressed && n.onPressed.event === "setupPlugin" && n.onPressed.arg === HDFULL));
   // Seriesflix has an update; the rest of the catalog is to install.
   assert.ok(nodes(tree).some((n) => n.onPressed && n.onPressed.event === "updateOne" && n.onPressed.arg === SERIESFLIX));
   const installs = nodes(tree).filter((n) => n.onPressed && n.onPressed.go && n.onPressed.go.installPlugin);
   assert.equal(installs.length, 20);
   // Installed first: the grid's first cards are HDFull and Seriesflix, then the rest.
   const gridCards = byKey(tree, "pluginsGrid").children.map((c) => c.key);
-  assert.deepEqual(gridCards.slice(0, 2), ["card-7", "card-15"]);
+  assert.deepEqual(gridCards.slice(0, 3), ["card-0", "card-7", "card-15"]);
+  // A tap on an installed card opens it.
+  assert.deepEqual(byKey(tree, "card-7").onTap, { go: { plugin: { repo: HDFULL } } });
   // The filter: only installed, only missing.
   const f1 = await p.screenEvent({ name: "filter", value: "installed", state: o.state });
   const t1 = await p.screen({ state: { ...o.state, ...f1.state }, device: "phone", installed: {} });
-  assert.equal(byKey(t1, "pluginsGrid").children.length, 2);
+  assert.equal(byKey(t1, "pluginsGrid").children.length, 3);
   const f2 = await p.screenEvent({ name: "filter", value: "missing", state: o.state });
   const t2 = await p.screen({ state: { ...o.state, ...f2.state }, device: "phone", installed: {} });
   assert.equal(byKey(t2, "pluginsGrid").children.length, 20);

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.1
+
+- Compact cards: a tap opens the plugin, icon-only buttons (uninstall left, open right, download, update); Kino Resolver is one more card
+- A search field on top (Buscar película o serie) instead of the bar's icon, and the back arrow instead of the X
+
 ## 0.2.0
 
 - Your plugins as cards in a grid: the icon on top, Instalar below, or Abrir and Desinstalar with a green edge when installed; an update badge; a filter (Todos, Instalados, No instalados), installed first

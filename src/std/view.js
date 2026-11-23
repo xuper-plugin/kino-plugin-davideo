@@ -113,7 +113,8 @@ export function browseView(cfg, { tab, data, recent, pending, failed, searching 
   // ops at once) instead of the screen, and the next Back, with no `onBack` declared, leaves.
   const tabsInBar = tv && withTabs; // on a TV the tabs sit in the bar beside the brand (one D-pad strip); elsewhere under it
   const appBar = bar({
-    leading: iconButton("close", "close", "close", { go: { close: true } }),
+    // backArrow (std 1.7.0): the screen leaves with Kino's back arrow instead of the X.
+    leading: cfg.backArrow ? iconButton("close", "arrow_back", "back", { go: { close: true } }) : iconButton("close", "close", "close", { go: { close: true } }),
     title: { type: "Row", key: "titleRow", gap: tabsInBar ? 24 : 8, crossAxisAlignment: "center", children: [
       { ...iconButton("closeSearch", "arrow_back", "back", { ui: searchClosedOps(tabsInBar), event: "searchClosed" }), hidden: true },
       brand(cfg),
@@ -123,7 +124,8 @@ export function browseView(cfg, { tab, data, recent, pending, failed, searching 
         onSubmitted: "search", trailingIcon: "search", ...twin("search", "trailingLabel"), onTrailingTap: "search" },
     ] },
     actions: [
-      iconButton("searchButton", "search", "search", { ui: searchOpenOps(tabsInBar), event: "searchOpened" }),
+      // barSearch: false (std 1.7.0): the plugin draws its own search field in its page instead of the bar's icon.
+      ...(cfg.barSearch ? [iconButton("searchButton", "search", "search", { ui: searchOpenOps(tabsInBar), event: "searchOpened" })] : []),
       iconButton("settingsButton", "settings", "settings", "openSettings"),
     ],
   });

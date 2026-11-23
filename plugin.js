@@ -230,7 +230,8 @@ function browseView(cfg, { tab, data, recent, pending, failed, searching = false
   const banner = body.length > 0 && isBanner(body[0]) ? body.shift() : null;
   const tabsInBar = tv && withTabs;
   const appBar = bar({
-    leading: iconButton("close", "close", "close", { go: { close: true } }),
+    // backArrow (std 1.7.0): the screen leaves with Kino's back arrow instead of the X.
+    leading: cfg.backArrow ? iconButton("close", "arrow_back", "back", { go: { close: true } }) : iconButton("close", "close", "close", { go: { close: true } }),
     title: { type: "Row", key: "titleRow", gap: tabsInBar ? 24 : 8, crossAxisAlignment: "center", children: [
       { ...iconButton("closeSearch", "arrow_back", "back", { ui: searchClosedOps(tabsInBar), event: "searchClosed" }), hidden: true },
       brand(cfg),
@@ -250,7 +251,8 @@ function browseView(cfg, { tab, data, recent, pending, failed, searching = false
       }
     ] },
     actions: [
-      iconButton("searchButton", "search", "search", { ui: searchOpenOps(tabsInBar), event: "searchOpened" }),
+      // barSearch: false (std 1.7.0): the plugin draws its own search field in its page instead of the bar's icon.
+      ...cfg.barSearch ? [iconButton("searchButton", "search", "search", { ui: searchOpenOps(tabsInBar), event: "searchOpened" })] : [],
       iconButton("settingsButton", "settings", "settings", "openSettings")
     ]
   });
@@ -426,8 +428,8 @@ var INFLIGHT_KEY = "std:inflight";
 var INFLIGHT_STALE_MS = 18e3;
 var MAX_META_TICKS = 10;
 var DEFAULT_TABS = [{ id: "inicio", label: "Inicio", labelEn: "Home" }];
-function makeStandardScreen({ kino, name, nameEn, logo = null, logoAspect = "1:1", needsResolver, hasSettings, tabs, loadTab, homeKey = null, titleOf: titleOf2, typeOf, tmdbPictures = false, imageHeaders = null, searchHere = null, page = null }) {
-  const cfg = { name, nameEn, logo, logoAspect, imageHeaders, hasSettings: !!hasSettings, tabs: Array.isArray(tabs) && tabs.length > 0 ? tabs : DEFAULT_TABS };
+function makeStandardScreen({ kino, name, nameEn, logo = null, logoAspect = "1:1", needsResolver, hasSettings, tabs, loadTab, homeKey = null, titleOf: titleOf2, typeOf, tmdbPictures = false, imageHeaders = null, searchHere = null, page = null, barSearch = true, backArrow = false }) {
+  const cfg = { name, nameEn, logo, logoAspect, imageHeaders, hasSettings: !!hasSettings, barSearch: barSearch !== false, backArrow: backArrow === true, tabs: Array.isArray(tabs) && tabs.length > 0 ? tabs : DEFAULT_TABS };
   const TAB_IDS = cfg.tabs.map((t) => t.id);
   const meta = makeMetaCache({ kino, titleOf: titleOf2, typeOf, tmdbPictures });
   function slidesFromMeta(rails) {
@@ -894,58 +896,56 @@ var resultLine = (r) => {
       return null;
   }
 };
-function pluginCard(entry, row, last, i) {
+var iconBtn = (key, icon, es, en, onPressed) => ({ type: "IconButton", key, icon, labelText: es, labelTextEn: en, tooltip: es, tooltipEn: en, onPressed });
+function pluginCard(entry, row, last, i, { heart = false } = {}) {
   const installed = !!row;
   const lines = [
     {
       type: "Image",
       key: `icon-${i}`,
       url: iconOf(entry),
-      w: 80,
-      h: 80,
+      w: 64,
+      h: 64,
       radius: "large",
       fit: "cover",
       fallback: { type: "Icon", key: `iconFb-${i}`, name: "movie", color: "muted" }
     },
-    text(`name-${i}`, entry.name, entry.name, { style: "h5", textAlign: "center", maxLines: 2 })
+    text(`name-${i}`, entry.name, entry.name, { style: "label", textAlign: "center", maxLines: 1 })
   ];
-  if (installed) {
-    lines.push(text(`ver-${i}`, `v${row.version}`, `v${row.version}`, { color: "muted", textAlign: "center" }));
-    if (row.available) {
-      lines.push({ type: "Row", key: `upd-${i}`, gap: 4, mainAxisAlignment: "center", crossAxisAlignment: "center", children: [
-        { type: "Icon", key: `updIcon-${i}`, name: "refresh", color: "primary" },
-        { type: "Badge", key: `updBadge-${i}`, text: `v${row.available}`, textEn: `v${row.available}`, color: "primary" }
-      ] });
-    }
-    if (!row.enabled) lines.push(text(`off-${i}`, "Apagado", "Switched off", { color: "muted", textAlign: "center" }));
-    if (entry.setup && row.setupRunning) lines.push(text(`setupRun-${i}`, "Configurándose…", "Setting up…", { color: "muted", textAlign: "center" }));
-    else if (entry.setup && row.setupReady === false) lines.push(text(`setupNeed-${i}`, "Necesita configurarse", "Needs setting up", { color: "error", textAlign: "center" }));
-    const l = resultLine(last);
-    if (l) lines.push(text(`last-${i}`, l[0], l[1], { color: "muted", textAlign: "center" }));
+  if (installed && row.available) {
+    lines.push({ type: "Badge", key: `updBadge-${i}`, text: `v${row.available}`, textEn: `v${row.available}`, color: "primary" });
+  } else if (installed) {
+    lines.push(text(`ver-${i}`, `v${row.version}`, `v${row.version}`, { style: "caption", color: "muted", textAlign: "center" }));
   }
+  if (installed && entry.setup && row.setupReady === false && !row.setupRunning) {
+    lines.push(text(`setupNeed-${i}`, "Configúralo", "Set it up", { style: "caption", color: "error", textAlign: "center" }));
+  }
+  const l = installed ? resultLine(last) : null;
+  if (l && last.status !== "updated") lines.push(text(`last-${i}`, l[0], l[1], { style: "caption", color: "muted", textAlign: "center", maxLines: 2 }));
   const buttons = [];
   if (!installed) {
-    buttons.push({ type: "ElevatedButton", key: `install-${i}`, icon: "download", ...label("Instalar", "Install"), onPressed: { go: { installPlugin: { repo: entry.repo } } } });
+    buttons.push(iconBtn(`install-${i}`, "download", `Instalar ${entry.name}`, `Install ${entry.name}`, { go: { installPlugin: { repo: entry.repo } } }));
   } else {
-    if (row.available) buttons.push({ type: "ElevatedButton", key: `update-${i}`, icon: "refresh", ...label("Actualizar", "Update"), onPressed: { event: "updateOne", arg: entry.repo } });
-    if (entry.setup && row.setupReady === false && !row.setupRunning) buttons.push({ type: "ElevatedButton", key: `setup-${i}`, icon: "settings", ...label("Configurar", "Set up"), onPressed: { event: "setupPlugin", arg: entry.repo } });
-    buttons.push({ type: "TextButton", key: `open-${i}`, ...label("Abrir", "Open"), onPressed: { go: { plugin: { repo: entry.repo } } } });
-    buttons.push({ type: "TextButton", key: `uninstall-${i}`, ...label("Desinstalar", "Uninstall"), onPressed: { go: { uninstallPlugin: { repo: entry.repo } } } });
+    if (!heart) buttons.push(iconBtn(`uninstall-${i}`, "delete", `Desinstalar ${entry.name}`, `Uninstall ${entry.name}`, { go: { uninstallPlugin: { repo: entry.repo } } }));
+    if (row.available) buttons.push(iconBtn(`update-${i}`, "refresh", `Actualizar ${entry.name}`, `Update ${entry.name}`, { event: "updateOne", arg: entry.repo }));
+    if (entry.setup && row.setupReady === false && !row.setupRunning) buttons.push(iconBtn(`setup-${i}`, "settings", `Configurar ${entry.name}`, `Set up ${entry.name}`, { event: "setupPlugin", arg: entry.repo }));
+    if (!heart) buttons.push(iconBtn(`open-${i}`, "open_in_new", `Abrir ${entry.name}`, `Open ${entry.name}`, { go: { plugin: { repo: entry.repo } } }));
   }
   return {
     type: "Card",
     key: `card-${i}`,
-    // Installed: a green edge (Kino's success colour), the rest none.
+    // Installed: a green edge (Kino's success colour); a tap on it opens the plugin (never the heart: it has no screen to show).
     ...installed ? { border: { width: 2, color: "success" } } : {},
-    children: [{ type: "Column", padding: 12, gap: 8, crossAxisAlignment: "center", children: [
+    ...installed && !heart ? { onTap: { go: { plugin: { repo: entry.repo } } } } : {},
+    children: [{ type: "Column", padding: 8, gap: 4, crossAxisAlignment: "center", children: [
       ...lines,
-      { type: "Column", key: `actions-${i}`, gap: 4, crossAxisAlignment: "stretch", children: buttons }
+      ...buttons.length ? [{ type: "Row", key: `actions-${i}`, mainAxisAlignment: buttons.length > 1 ? "spaceBetween" : "center", children: buttons }] : []
     ] }]
   };
 }
 var FILTERS = ["all", "installed", "missing"];
 var filterOf = (state) => state && FILTERS.includes(state.filter) ? state.filter : "all";
-var grid = (key, cards) => ({ type: "GridView", key, columns: { compact: 2, medium: 3, expanded: 4 }, gap: 12, children: cards });
+var grid = (key, cards) => ({ type: "GridView", key, columns: { compact: 3, medium: 4, expanded: 6 }, gap: 8, children: cards });
 function pageView({ state }) {
   const st = state && state.mp;
   const nodes = [];
@@ -967,10 +967,21 @@ function pageView({ state }) {
       { type: "ElevatedButton", key: "enableAuto", icon: "sync", ...label("Activar", "Turn on"), onPressed: { event: "enableAuto" } }
     ] }] });
   }
+  nodes.unshift({
+    type: "TextField",
+    key: "dvSearch",
+    kind: "search",
+    maxLength: 200,
+    hintText: "Buscar película o serie",
+    hintTextEn: "Search a movie or a series",
+    leadingIcon: "search",
+    onSubmitted: "search",
+    trailingIcon: "arrow_forward",
+    trailingLabel: "Buscar",
+    trailingLabelEn: "Search",
+    onTrailingTap: "search"
+  });
   const lastOf = (repo) => (st.lastResult || []).find((r) => r && r.repo === repo);
-  nodes.push(text("heartTitle", "El corazón", "The heart", { style: "h4" }));
-  nodes.push(text("heartText", "Kino Resolver abre los servidores de casi todos tus plugins.", "Kino Resolver opens the servers of almost all your plugins.", { color: "muted" }));
-  nodes.push(grid("heartGrid", [pluginCard(RESOLVER, st.plugins[RESOLVER.repo], lastOf(RESOLVER.repo), 0)]));
   const filter = filterOf(state);
   nodes.push({ type: "Row", key: "pluginsHead", gap: 8, crossAxisAlignment: "center", children: [
     text("mineTitle", "Tus plugins", "Your plugins", { style: "h4" }),
@@ -981,8 +992,9 @@ function pageView({ state }) {
     { value: "installed", label: "Instalados", labelEn: "Installed" },
     { value: "missing", label: "No instalados", labelEn: "Not installed" }
   ] });
-  const installed = PLUGINS.filter((p) => st.plugins[p.repo]);
-  const missing = PLUGINS.filter((p) => !st.plugins[p.repo]);
+  const all = [RESOLVER, ...PLUGINS];
+  const installed = all.filter((p) => st.plugins[p.repo]);
+  const missing = all.filter((p) => !st.plugins[p.repo]);
   const shown = filter === "installed" ? installed : filter === "missing" ? missing : [...installed, ...missing];
   if (!shown.length) {
     nodes.push(text(
@@ -992,7 +1004,7 @@ function pageView({ state }) {
       { color: "muted" }
     ));
   } else {
-    nodes.push(grid("pluginsGrid", shown.map((p) => pluginCard(p, st.plugins[p.repo] || null, lastOf(p.repo), 1 + PLUGINS.indexOf(p)))));
+    nodes.push(grid("pluginsGrid", shown.map((p) => pluginCard(p, st.plugins[p.repo] || null, lastOf(p.repo), all.indexOf(p), { heart: p === RESOLVER }))));
   }
   nodes.push(text(
     "autoText",
@@ -1023,6 +1035,8 @@ var standard = () => std ?? (std = makeStandardScreen({
   logoAspect: LOGO_ASPECT,
   needsResolver: false,
   hasSettings: false,
+  barSearch: false,
+  backArrow: true,
   tabs: [{ id: "mine", label: "Mis plugins", labelEn: "My plugins" }],
   loadTab: async () => ({ rows: [] }),
   searchHere: { sources, searchIn },

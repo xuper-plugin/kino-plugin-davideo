@@ -23,7 +23,7 @@ async function searchIn(q, repos) {
 
 let std = null;
 const standard = () => (std ??= makeStandardScreen({
-  kino: globalThis.kino, name: "Da-Video", logo: LOGO, logoAspect: LOGO_ASPECT, needsResolver: false, hasSettings: false,
+  kino: globalThis.kino, name: "Da-Video", logo: LOGO, logoAspect: LOGO_ASPECT, needsResolver: false, hasSettings: false, barSearch: false, backArrow: true,
   tabs: [{ id: "mine", label: "Mis plugins", labelEn: "My plugins" }],
   loadTab: async () => ({ rows: [] }),
   searchHere: { sources, searchIn },
