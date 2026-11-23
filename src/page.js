@@ -146,10 +146,14 @@ function pluginSheet(state, st) {
   const pair = (key, buttons) => ({ type: "Row", key, gap: 12, children: buttons.map((b) => ({ ...b, weight: 1 })) });
   const extra = [];
   if (row.available) extra.push({ type: "Button", key: "sheetUpdate", variant: "secondary", ...label(`Actualizar a v${row.available}`, `Update to v${row.available}`), onPressed: { event: "updateOne", arg: entry.repo } });
+  // A plugin that plays nothing without the resolver, while the resolver is missing: Instalar resolver instead of Abrir.
+  const resolverMissing = entry.needsResolver === true && !st.plugins[RESOLVER.repo];
   const main = [
     ...(entry !== RESOLVER ? [{ type: "Button", key: "sheetUninstall", variant: "secondary", ...label("Desinstalar", "Uninstall"), onPressed: { go: { uninstallPlugin: { repo: entry.repo } } } }] : []),
     // Still to set up: Configurar, which opens its own screen too (where it sets itself up: Xuper's Ingresar, HDFull's catalog).
-    { type: "ElevatedButton", key: "sheetOpen", ...(row.needsSetup ? label("Configurar", "Set up") : label("Abrir", "Open")), onPressed: { go: { plugin: { repo: entry.repo } } } },
+    resolverMissing
+      ? { type: "ElevatedButton", key: "sheetResolver", ...label("Instalar resolver", "Install the resolver"), onPressed: { go: { installPlugin: { repo: RESOLVER.repo } } } }
+      : { type: "ElevatedButton", key: "sheetOpen", ...(row.needsSetup ? label("Configurar", "Set up") : label("Abrir", "Open")), onPressed: { go: { plugin: { repo: entry.repo } } } },
   ];
   const children = [
     { type: "Row", key: "sheetHead", gap: 16, crossAxisAlignment: "center", children: [
@@ -157,7 +161,8 @@ function pluginSheet(state, st) {
       text("sheetVer", row.available ? `Versión ${row.version} · hay una nueva` : `Versión ${row.version}`,
         row.available ? `Version ${row.version} · a new one is out` : `Version ${row.version}`, { color: "muted" }),
     ] },
-    ...(row.needsSetup ? [text("sheetSetupNote", "Falta configurarlo: ábrelo y sigue sus pasos.", "It still needs setting up: open it and follow its steps.", { color: "muted" })] : []),
+    ...(resolverMissing ? [text("sheetResolverNote", "Para abrir este plugin es necesario el resolver.", "To open this plugin you need the resolver.", { color: "muted" })] : []),
+    ...(!resolverMissing && row.needsSetup ? [text("sheetSetupNote", "Falta configurarlo: ábrelo y sigue sus pasos.", "It still needs setting up: open it and follow its steps.", { color: "muted" })] : []),
     ...(extra.length ? [pair("sheetExtra", extra)] : []),
     pair("sheetMain", main),
   ];

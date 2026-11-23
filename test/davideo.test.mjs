@@ -142,3 +142,24 @@ test("the job: one updateAll, and a refusal never throws", async () => {
   const p2 = await load(fakeKino({ updateAllError: "auto_update_off" }));
   assert.equal(await p2.job({ id: "update", reason: "scheduled" }), null);
 });
+
+test("the sheet of a plugin that needs the resolver, while the resolver is missing: Instalar resolver, not Abrir", async () => {
+  const kino = fakeKino({ updates: { plugins: [
+    { repo: SERIESFLIX, id: "seriesflix", name: "Seriesflix", version: "1.3.6", available: null, enabled: true },
+    { repo: "xuper-plugin/kino-plugin-animes-es", id: "animes-es", name: "AnimES", version: "1.7.7", available: null, enabled: true },
+  ], running: false, lastRun: null, lastResult: [] } });
+  const p = await load(kino);
+  const o = await p.screenEvent({ name: "open", state: {}, device: "phone", route: { name: "main" } });
+  const ps = await p.screenEvent({ name: "pick", arg: SERIESFLIX, state: o.state });
+  const t = await p.screen({ state: { ...o.state, ...ps.state }, device: "phone", installed: {} });
+  assert.ok(!byKey(t, "sheetOpen"));
+  assert.equal(byKey(t, "sheetResolver").labelText, "Instalar resolver");
+  assert.deepEqual(byKey(t, "sheetResolver").onPressed, { go: { installPlugin: { repo: RESOLVER } } });
+  assert.equal(byKey(t, "sheetResolverNote").text, "Para abrir este plugin es necesario el resolver.");
+  assert.ok(byKey(t, "sheetUninstall"), "it can still be uninstalled");
+  // AnimES plays without the resolver: Abrir as always.
+  const pa = await p.screenEvent({ name: "pick", arg: "xuper-plugin/kino-plugin-animes-es", state: o.state });
+  const ta = await p.screen({ state: { ...o.state, ...pa.state }, device: "phone", installed: {} });
+  assert.equal(byKey(ta, "sheetOpen").labelText, "Abrir");
+  assert.ok(!byKey(ta, "sheetResolverNote"));
+});

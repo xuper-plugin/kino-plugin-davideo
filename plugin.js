@@ -762,26 +762,26 @@ var PLUGINS = [
   { repo: "xuper-plugin/kino-plugin-xuper", name: "Xuper", kind: "live" },
   { repo: "xuper-plugin/kino-plugin-movieplus", name: "Movie+", kind: "movies" },
   { repo: "xuper-plugin/kino-plugin-zapptv", name: "ZappTV", kind: "live" },
-  { repo: "xuper-plugin/kino-plugin-hdfull", name: "HDFull", kind: "movies" },
+  { repo: "xuper-plugin/kino-plugin-hdfull", name: "HDFull", kind: "movies", needsResolver: true },
   { repo: "xuper-plugin/kino-plugin-animes-es", name: "AnimES", kind: "anime" },
-  { repo: "xuper-plugin/kino-plugin-cinehdplus", name: "CineHD Plus", kind: "movies" },
-  { repo: "xuper-plugin/kino-plugin-cinemitas", name: "Cinemitas", kind: "movies" },
-  { repo: "xuper-plugin/kino-plugin-cuevanapro", name: "Cuevana Pro", kind: "movies" },
-  { repo: "xuper-plugin/kino-plugin-doramasyt", name: "DoramasYT", kind: "series" },
-  { repo: "xuper-plugin/kino-plugin-embed69", name: "Embed 69", kind: "movies" },
-  { repo: "xuper-plugin/kino-plugin-lacartoons", name: "LA Cartoons Plus", kind: "kids" },
-  { repo: "xuper-plugin/kino-plugin-latino", name: "Latino", kind: "movies" },
-  { repo: "xuper-plugin/kino-plugin-mundodonghua", name: "MundoDonghua", kind: "anime" },
+  { repo: "xuper-plugin/kino-plugin-cinehdplus", name: "CineHD Plus", kind: "movies", needsResolver: true },
+  { repo: "xuper-plugin/kino-plugin-cinemitas", name: "Cinemitas", kind: "movies", needsResolver: true },
+  { repo: "xuper-plugin/kino-plugin-cuevanapro", name: "Cuevana Pro", kind: "movies", needsResolver: true },
+  { repo: "xuper-plugin/kino-plugin-doramasyt", name: "DoramasYT", kind: "series", needsResolver: true },
+  { repo: "xuper-plugin/kino-plugin-embed69", name: "Embed 69", kind: "movies", needsResolver: true },
+  { repo: "xuper-plugin/kino-plugin-lacartoons", name: "LA Cartoons Plus", kind: "kids", needsResolver: true },
+  { repo: "xuper-plugin/kino-plugin-latino", name: "Latino", kind: "movies", needsResolver: true },
+  { repo: "xuper-plugin/kino-plugin-mundodonghua", name: "MundoDonghua", kind: "anime", needsResolver: true },
   { repo: "xuper-plugin/maraton", name: "PelisYSeries", kind: "movies" },
-  { repo: "xuper-plugin/kino-plugin-peliculasflix", name: "PeliculasFlix", kind: "movies" },
-  { repo: "xuper-plugin/kino-plugin-pelisgo", name: "Pelisgo", kind: "movies" },
-  { repo: "xuper-plugin/kino-plugin-pelispedia", name: "Pelispedia", kind: "movies" },
-  { repo: "xuper-plugin/kino-plugin-seriesflix", name: "Seriesflix", kind: "series" },
-  { repo: "xuper-plugin/kino-plugin-serieskao", name: "SeriesKao", kind: "series" },
-  { repo: "xuper-plugin/kino-plugin-seriesmetro", name: "SeriesMetro", kind: "series" },
-  { repo: "xuper-plugin/kino-plugin-sololatino", name: "SoloLatino", kind: "movies" },
-  { repo: "xuper-plugin/kino-plugin-latanime", name: "TodoAnime", kind: "anime" },
-  { repo: "xuper-plugin/kino-plugin-verpelis", name: "VerPelis", kind: "movies" }
+  { repo: "xuper-plugin/kino-plugin-peliculasflix", name: "PeliculasFlix", kind: "movies", needsResolver: true },
+  { repo: "xuper-plugin/kino-plugin-pelisgo", name: "Pelisgo", kind: "movies", needsResolver: true },
+  { repo: "xuper-plugin/kino-plugin-pelispedia", name: "Pelispedia", kind: "movies", needsResolver: true },
+  { repo: "xuper-plugin/kino-plugin-seriesflix", name: "Seriesflix", kind: "series", needsResolver: true },
+  { repo: "xuper-plugin/kino-plugin-serieskao", name: "SeriesKao", kind: "series", needsResolver: true },
+  { repo: "xuper-plugin/kino-plugin-seriesmetro", name: "SeriesMetro", kind: "series", needsResolver: true },
+  { repo: "xuper-plugin/kino-plugin-sololatino", name: "SoloLatino", kind: "movies", needsResolver: true },
+  { repo: "xuper-plugin/kino-plugin-latanime", name: "TodoAnime", kind: "anime", needsResolver: true },
+  { repo: "xuper-plugin/kino-plugin-verpelis", name: "VerPelis", kind: "movies", needsResolver: true }
 ];
 var iconOf = (entry) => `https://raw.githubusercontent.com/${entry.repo}/HEAD/icon.png`;
 
@@ -914,10 +914,11 @@ function pluginSheet(state, st) {
   const pair = (key, buttons) => ({ type: "Row", key, gap: 12, children: buttons.map((b) => ({ ...b, weight: 1 })) });
   const extra = [];
   if (row.available) extra.push({ type: "Button", key: "sheetUpdate", variant: "secondary", ...label(`Actualizar a v${row.available}`, `Update to v${row.available}`), onPressed: { event: "updateOne", arg: entry.repo } });
+  const resolverMissing = entry.needsResolver === true && !st.plugins[RESOLVER.repo];
   const main = [
     ...entry !== RESOLVER ? [{ type: "Button", key: "sheetUninstall", variant: "secondary", ...label("Desinstalar", "Uninstall"), onPressed: { go: { uninstallPlugin: { repo: entry.repo } } } }] : [],
     // Still to set up: Configurar, which opens its own screen too (where it sets itself up: Xuper's Ingresar, HDFull's catalog).
-    { type: "ElevatedButton", key: "sheetOpen", ...row.needsSetup ? label("Configurar", "Set up") : label("Abrir", "Open"), onPressed: { go: { plugin: { repo: entry.repo } } } }
+    resolverMissing ? { type: "ElevatedButton", key: "sheetResolver", ...label("Instalar resolver", "Install the resolver"), onPressed: { go: { installPlugin: { repo: RESOLVER.repo } } } } : { type: "ElevatedButton", key: "sheetOpen", ...row.needsSetup ? label("Configurar", "Set up") : label("Abrir", "Open"), onPressed: { go: { plugin: { repo: entry.repo } } } }
   ];
   const children = [
     { type: "Row", key: "sheetHead", gap: 16, crossAxisAlignment: "center", children: [
@@ -929,7 +930,8 @@ function pluginSheet(state, st) {
         { color: "muted" }
       )
     ] },
-    ...row.needsSetup ? [text("sheetSetupNote", "Falta configurarlo: ábrelo y sigue sus pasos.", "It still needs setting up: open it and follow its steps.", { color: "muted" })] : [],
+    ...resolverMissing ? [text("sheetResolverNote", "Para abrir este plugin es necesario el resolver.", "To open this plugin you need the resolver.", { color: "muted" })] : [],
+    ...!resolverMissing && row.needsSetup ? [text("sheetSetupNote", "Falta configurarlo: ábrelo y sigue sus pasos.", "It still needs setting up: open it and follow its steps.", { color: "muted" })] : [],
     ...extra.length ? [pair("sheetExtra", extra)] : [],
     pair("sheetMain", main)
   ];

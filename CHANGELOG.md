@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.5
+
+- A plugin that needs Kino Resolver, while the resolver is missing: its sheet says so and offers Instalar resolver instead of Abrir.
+
 ## 0.3.4
 
 - std 1.7.1: the search field hides the bar's back arrow while open.
