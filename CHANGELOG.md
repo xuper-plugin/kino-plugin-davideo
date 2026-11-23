@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.3
+
+- A plugin that still needs setting up (Kino says so) shows Configurar instead of Abrir, opening its own screen
+- Movie+ joins the list; Xuper, Movie+, ZappTV and HDFull come first
+
 ## 0.3.2
 
 - The plugin sheet: its name as the title with the close X at the top, Desinstalar and Abrir side by side, no icons

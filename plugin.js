@@ -756,13 +756,17 @@ var LOGO_ASPECT = "1:1";
 var OWNER = "xuper-plugin";
 var RESOLVER = { repo: "xuper-plugin/kino-plugin-kino-resolver", name: "Kino Resolver" };
 var PLUGINS = [
+  // Preferred first (owner, 2026-11-23): Xuper, Movie+, ZappTV, HDFull; then the rest.
+  { repo: "xuper-plugin/kino-plugin-xuper", name: "Xuper", kind: "live" },
+  { repo: "xuper-plugin/kino-plugin-movieplus", name: "Movie+", kind: "movies" },
+  { repo: "xuper-plugin/kino-plugin-zapptv", name: "ZappTV", kind: "live" },
+  { repo: "xuper-plugin/kino-plugin-hdfull", name: "HDFull", kind: "movies" },
   { repo: "xuper-plugin/kino-plugin-animes-es", name: "AnimES", kind: "anime" },
   { repo: "xuper-plugin/kino-plugin-cinehdplus", name: "CineHD Plus", kind: "movies" },
   { repo: "xuper-plugin/kino-plugin-cinemitas", name: "Cinemitas", kind: "movies" },
   { repo: "xuper-plugin/kino-plugin-cuevanapro", name: "Cuevana Pro", kind: "movies" },
   { repo: "xuper-plugin/kino-plugin-doramasyt", name: "DoramasYT", kind: "series" },
   { repo: "xuper-plugin/kino-plugin-embed69", name: "Embed 69", kind: "movies" },
-  { repo: "xuper-plugin/kino-plugin-hdfull", name: "HDFull", kind: "movies", setup: true },
   { repo: "xuper-plugin/kino-plugin-lacartoons", name: "LA Cartoons Plus", kind: "kids" },
   { repo: "xuper-plugin/kino-plugin-latino", name: "Latino", kind: "movies" },
   { repo: "xuper-plugin/kino-plugin-mundodonghua", name: "MundoDonghua", kind: "anime" },
@@ -775,9 +779,7 @@ var PLUGINS = [
   { repo: "xuper-plugin/kino-plugin-seriesmetro", name: "SeriesMetro", kind: "series" },
   { repo: "xuper-plugin/kino-plugin-sololatino", name: "SoloLatino", kind: "movies" },
   { repo: "xuper-plugin/kino-plugin-latanime", name: "TodoAnime", kind: "anime" },
-  { repo: "xuper-plugin/kino-plugin-verpelis", name: "VerPelis", kind: "movies" },
-  { repo: "xuper-plugin/kino-plugin-xuper", name: "Xuper", kind: "live" },
-  { repo: "xuper-plugin/kino-plugin-zapptv", name: "ZappTV", kind: "live" }
+  { repo: "xuper-plugin/kino-plugin-verpelis", name: "VerPelis", kind: "movies" }
 ];
 var iconOf = (entry) => `https://raw.githubusercontent.com/${entry.repo}/HEAD/icon.png`;
 
@@ -802,21 +804,11 @@ async function loadStatus() {
     out.lastResult = Array.isArray(u.lastResult) ? u.lastResult.slice(0, 64) : [];
     for (const p of Array.isArray(u.plugins) ? u.plugins : []) {
       if (!p || typeof p.repo !== "string") continue;
-      out.plugins[p.repo] = { name: String(p.name || p.repo), version: String(p.version || ""), available: p.available || null, enabled: p.enabled !== false };
+      out.plugins[p.repo] = { name: String(p.name || p.repo), version: String(p.version || ""), available: p.available || null, enabled: p.enabled !== false, needsSetup: p.needsSetup === true };
     }
   } catch (e) {
     out.code = e && e.code || "error";
     return out;
-  }
-  for (const p of PLUGINS) {
-    const row = out.plugins[p.repo];
-    if (!p.setup || !row) continue;
-    try {
-      const s = await kino.plugins.setupStatus(p.repo);
-      row.setupReady = !!s.ready;
-      row.setupRunning = !!s.running;
-    } catch {
-    }
   }
   return out;
 }
@@ -828,7 +820,7 @@ function jobIsOn() {
     return null;
   }
 }
-var statusState = (st) => ({ mp: st, jobOn: jobIsOn(), busy: st.running || Object.values(st.plugins).some((r) => r.setupRunning) });
+var statusState = (st) => ({ mp: st, jobOn: jobIsOn(), busy: st.running });
 var PAGE_EVENTS = {
   async refresh() {
     return { state: statusState(await loadStatus()) };
@@ -848,15 +840,6 @@ var PAGE_EVENTS = {
   },
   async updateOne({ arg }) {
     return typeof arg === "string" ? startPass([arg]) : null;
-  },
-  async setupPlugin({ arg }) {
-    if (typeof arg !== "string") return null;
-    try {
-      await k().plugins.setup(arg);
-    } catch (e) {
-      return { state: { notice: noticeOf(e && e.code || "error") } };
-    }
-    return { state: { ...statusState(await loadStatus()), busy: true, notice: null } };
   }
 };
 async function startPass(only) {
@@ -902,7 +885,7 @@ function pluginTile(entry, row, i) {
     }
   ];
   if (installed && row.available) layers.push(pill(`new-${i}`, "Nueva", "New", "primary", { top: 0, right: 0 }));
-  else if (installed && entry.setup && row.setupReady === false && !row.setupRunning) layers.push(pill(`setup-${i}`, "Configurar", "Set up", "warning", { top: 0, right: 0 }));
+  else if (installed && row.needsSetup) layers.push(pill(`setup-${i}`, "Configurar", "Set up", "warning", { top: 0, right: 0 }));
   if (!installed) {
     layers.push(round(`in-${i}`, iconBtn(
       `install-${i}`,
@@ -929,10 +912,10 @@ function pluginSheet(state, st) {
   const pair = (key, buttons) => ({ type: "Row", key, gap: 12, children: buttons.map((b) => ({ ...b, weight: 1 })) });
   const extra = [];
   if (row.available) extra.push({ type: "Button", key: "sheetUpdate", variant: "secondary", ...label(`Actualizar a v${row.available}`, `Update to v${row.available}`), onPressed: { event: "updateOne", arg: entry.repo } });
-  if (entry.setup && row.setupReady === false && !row.setupRunning) extra.push({ type: "Button", key: "sheetSetup", variant: "secondary", ...label("Configurar", "Set up"), onPressed: { event: "setupPlugin", arg: entry.repo } });
   const main = [
     ...entry !== RESOLVER ? [{ type: "Button", key: "sheetUninstall", variant: "secondary", ...label("Desinstalar", "Uninstall"), onPressed: { go: { uninstallPlugin: { repo: entry.repo } } } }] : [],
-    { type: "ElevatedButton", key: "sheetOpen", ...label("Abrir", "Open"), onPressed: { go: { plugin: { repo: entry.repo } } } }
+    // Still to set up: Configurar, which opens its own screen too (where it sets itself up: Xuper's Ingresar, HDFull's catalog).
+    { type: "ElevatedButton", key: "sheetOpen", ...row.needsSetup ? label("Configurar", "Set up") : label("Abrir", "Open"), onPressed: { go: { plugin: { repo: entry.repo } } } }
   ];
   const children = [
     { type: "Row", key: "sheetHead", gap: 16, crossAxisAlignment: "center", children: [
@@ -944,7 +927,7 @@ function pluginSheet(state, st) {
         { color: "muted" }
       )
     ] },
-    ...entry.setup && row.setupRunning ? [text("sheetSetupRun", "Configurándose…", "Setting up…", { color: "muted" })] : [],
+    ...row.needsSetup ? [text("sheetSetupNote", "Falta configurarlo: ábrelo y sigue sus pasos.", "It still needs setting up: open it and follow its steps.", { color: "muted" })] : [],
     ...extra.length ? [pair("sheetExtra", extra)] : [],
     pair("sheetMain", main)
   ];

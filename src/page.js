@@ -1,6 +1,6 @@
 // Da-Video's own page under the standard bar: Kino Resolver (the heart) first, then the person's plugins of xuper-plugin with
 // what each needs (an update, its setup), then the ones still to install. Everything it knows comes from Kino:
-// kino.manage.updates() (installed, versions, the update the last check found), kino.plugins.setupStatus (a plugin's setup).
+// kino.manage.updates() (installed, versions, the update the last check found, whether it still needs setting up).
 import { OWNER, RESOLVER, PLUGINS, entryOf, iconOf } from "./catalog.js";
 
 const POLL_MS = 3_000;
@@ -23,21 +23,11 @@ export async function loadStatus() {
     out.lastResult = Array.isArray(u.lastResult) ? u.lastResult.slice(0, 64) : [];
     for (const p of Array.isArray(u.plugins) ? u.plugins : []) {
       if (!p || typeof p.repo !== "string") continue;
-      out.plugins[p.repo] = { name: String(p.name || p.repo), version: String(p.version || ""), available: p.available || null, enabled: p.enabled !== false };
+      out.plugins[p.repo] = { name: String(p.name || p.repo), version: String(p.version || ""), available: p.available || null, enabled: p.enabled !== false, needsSetup: p.needsSetup === true };
     }
   } catch (e) {
     out.code = (e && e.code) || "error";
     return out;
-  }
-  // Setup: only for the installed plugins that have one, as Kino last heard it (no call to them).
-  for (const p of PLUGINS) {
-    const row = out.plugins[p.repo];
-    if (!p.setup || !row) continue;
-    try {
-      const s = await kino.plugins.setupStatus(p.repo);
-      row.setupReady = !!s.ready;
-      row.setupRunning = !!s.running;
-    } catch { /* no setup known: nothing to show */ }
   }
   return out;
 }
@@ -48,7 +38,7 @@ export function jobIsOn() {
   try { return typeof kino.jobOn === "function" ? !!kino.jobOn("update") : null; } catch { return null; }
 }
 
-const statusState = (st) => ({ mp: st, jobOn: jobIsOn(), busy: st.running || Object.values(st.plugins).some((r) => r.setupRunning) });
+const statusState = (st) => ({ mp: st, jobOn: jobIsOn(), busy: st.running });
 
 /** The page's events (std's `page.events`). */
 export const PAGE_EVENTS = {
@@ -70,15 +60,6 @@ export const PAGE_EVENTS = {
   },
   async updateOne({ arg }) {
     return typeof arg === "string" ? startPass([arg]) : null;
-  },
-  async setupPlugin({ arg }) {
-    if (typeof arg !== "string") return null;
-    try {
-      await k().plugins.setup(arg);
-    } catch (e) {
-      return { state: { notice: noticeOf((e && e.code) || "error") } };
-    }
-    return { state: { ...statusState(await loadStatus()), busy: true, notice: null } };
   },
 };
 
@@ -136,7 +117,7 @@ function pluginTile(entry, row, i) {
       positioned: { top: 8, left: 8 }, ...(installed ? {} : { opacity: 0.5 }) },
   ];
   if (installed && row.available) layers.push(pill(`new-${i}`, "Nueva", "New", "primary", { top: 0, right: 0 }));
-  else if (installed && entry.setup && row.setupReady === false && !row.setupRunning) layers.push(pill(`setup-${i}`, "Configurar", "Set up", "warning", { top: 0, right: 0 }));
+  else if (installed && row.needsSetup) layers.push(pill(`setup-${i}`, "Configurar", "Set up", "warning", { top: 0, right: 0 }));
   if (!installed) {
     layers.push(round(`in-${i}`, iconBtn(`install-${i}`, "download", `Instalar ${entry.name}`, `Install ${entry.name}`,
       { go: { installPlugin: { repo: entry.repo } } }, {}), { bottom: 0, right: 0 }, "primary"));
@@ -165,10 +146,10 @@ function pluginSheet(state, st) {
   const pair = (key, buttons) => ({ type: "Row", key, gap: 12, children: buttons.map((b) => ({ ...b, weight: 1 })) });
   const extra = [];
   if (row.available) extra.push({ type: "Button", key: "sheetUpdate", variant: "secondary", ...label(`Actualizar a v${row.available}`, `Update to v${row.available}`), onPressed: { event: "updateOne", arg: entry.repo } });
-  if (entry.setup && row.setupReady === false && !row.setupRunning) extra.push({ type: "Button", key: "sheetSetup", variant: "secondary", ...label("Configurar", "Set up"), onPressed: { event: "setupPlugin", arg: entry.repo } });
   const main = [
     ...(entry !== RESOLVER ? [{ type: "Button", key: "sheetUninstall", variant: "secondary", ...label("Desinstalar", "Uninstall"), onPressed: { go: { uninstallPlugin: { repo: entry.repo } } } }] : []),
-    { type: "ElevatedButton", key: "sheetOpen", ...label("Abrir", "Open"), onPressed: { go: { plugin: { repo: entry.repo } } } },
+    // Still to set up: Configurar, which opens its own screen too (where it sets itself up: Xuper's Ingresar, HDFull's catalog).
+    { type: "ElevatedButton", key: "sheetOpen", ...(row.needsSetup ? label("Configurar", "Set up") : label("Abrir", "Open")), onPressed: { go: { plugin: { repo: entry.repo } } } },
   ];
   const children = [
     { type: "Row", key: "sheetHead", gap: 16, crossAxisAlignment: "center", children: [
@@ -176,7 +157,7 @@ function pluginSheet(state, st) {
       text("sheetVer", row.available ? `Versión ${row.version} · hay una nueva` : `Versión ${row.version}`,
         row.available ? `Version ${row.version} · a new one is out` : `Version ${row.version}`, { color: "muted" }),
     ] },
-    ...(entry.setup && row.setupRunning ? [text("sheetSetupRun", "Configurándose…", "Setting up…", { color: "muted" })] : []),
+    ...(row.needsSetup ? [text("sheetSetupNote", "Falta configurarlo: ábrelo y sigue sus pasos.", "It still needs setting up: open it and follow its steps.", { color: "muted" })] : []),
     ...(extra.length ? [pair("sheetExtra", extra)] : []),
     pair("sheetMain", main),
   ];

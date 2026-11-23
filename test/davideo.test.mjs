@@ -21,7 +21,7 @@ function fakeKino(over = {}) {
         return over.updates ?? {
           plugins: [
             { repo: RESOLVER, id: "kino-resolver", name: "Kino Resolver", version: "0.0.27", available: "0.0.28", enabled: true },
-            { repo: HDFULL, id: "hdfull-local", name: "HDFull", version: "0.6.3", available: null, enabled: true },
+            { repo: HDFULL, id: "hdfull-local", name: "HDFull", version: "0.6.3", available: null, enabled: true, needsSetup: true },
             { repo: SERIESFLIX, id: "seriesflix", name: "Seriesflix", version: "1.3.3", available: "1.3.4", enabled: true },
           ],
           running: false, lastRun: null, lastResult: [],
@@ -30,7 +30,6 @@ function fakeKino(over = {}) {
       async updateAll(opts) { calls.push(["updateAll", opts ?? null]); if (over.updateAllError) { const e = new Error("x"); e.code = over.updateAllError; throw e; } return { started: true, running: true }; },
     },
     plugins: {
-      async setupStatus(repo) { calls.push(["setupStatus", repo]); return { ready: false, running: false }; },
       async setup(repo) { calls.push(["setup", repo]); return { state: "SETTING_UP" }; },
       async providers() { return [{ repo: HDFULL, id: "hdfull-local", name: "HDFull", version: "0.6.3" }, { repo: SERIESFLIX, id: "seriesflix", name: "Seriesflix", version: "1.3.3" }]; },
       async callAll(alias, call, arg, opts) {
@@ -70,24 +69,27 @@ test("the page (design C): home-screen icons, yours then the ones to install, Ed
   assert.ok(!byKey(tree, "searchButton"));
   assert.equal(byKey(tree, "close").icon, "arrow_back");
   // Yours: the heart first, then HDFull and Seriesflix; a tap on any asks for its sheet.
-  assert.deepEqual(byKey(tree, "mineGrid").children.map((c) => c.key), ["card-0", "card-7", "card-15"]);
-  assert.deepEqual(byKey(tree, "card-7").onTap, { event: "pick", arg: HDFULL });
+  assert.deepEqual(byKey(tree, "mineGrid").children.map((c) => c.key), ["card-0", "card-4", "card-18"]);
+  assert.deepEqual(byKey(tree, "card-4").onTap, { event: "pick", arg: HDFULL });
   // «Nueva» on the ones with an update (the heart and Seriesflix); «Configurar» on HDFull, which needs its setup.
-  assert.ok(byKey(tree, "new-0") && byKey(tree, "new-15") && byKey(tree, "setup-7"));
+  assert.ok(byKey(tree, "new-0") && byKey(tree, "new-18") && byKey(tree, "setup-4"));
   // The rest: dimmed, with a download button each (20 of them).
   const installs = nodes(tree).filter((n) => n.onPressed && n.onPressed.go && n.onPressed.go.installPlugin);
-  assert.equal(installs.length, 20);
-  assert.equal(byKey(tree, "missingGrid").children.length, 20);
+  assert.equal(installs.length, 21);
+  assert.equal(byKey(tree, "missingGrid").children.length, 21);
   // The sheet: Abrir, Configurar (HDFull needs its setup), Desinstalar; never Desinstalar for the heart.
   const pk = await p.screenEvent({ name: "pick", arg: HDFULL, state: o.state });
   assert.deepEqual(pk.ui, [{ open: "pluginSheet" }]);
   const te = await p.screen({ state: { ...o.state, ...pk.state }, device: "phone", installed: {} });
   assert.deepEqual(byKey(te, "sheetOpen").onPressed, { go: { plugin: { repo: HDFULL } } });
-  assert.deepEqual(byKey(te, "sheetSetup").onPressed, { event: "setupPlugin", arg: HDFULL });
+  // Still to set up: the main button is Configurar and opens its own screen.
+  assert.equal(byKey(te, "sheetOpen").labelText, "Configurar");
+  assert.ok(!byKey(te, "sheetSetup"));
   assert.deepEqual(byKey(te, "sheetUninstall").onPressed, { go: { uninstallPlugin: { repo: HDFULL } } });
   const ps = await p.screenEvent({ name: "pick", arg: SERIESFLIX, state: o.state });
   const ts = await p.screen({ state: { ...o.state, ...ps.state }, device: "phone", installed: {} });
   assert.deepEqual(byKey(ts, "sheetUpdate").onPressed, { event: "updateOne", arg: SERIESFLIX });
+  assert.equal(byKey(ts, "sheetOpen").labelText, "Abrir");
   const ph = await p.screenEvent({ name: "pick", arg: RESOLVER, state: o.state });
   const th = await p.screen({ state: { ...o.state, ...ph.state }, device: "phone", installed: {} });
   assert.ok(byKey(th, "sheetOpen") && !byKey(th, "sheetUninstall"));
@@ -113,13 +115,6 @@ test("updating: a pass starts on Kino's side and the page polls while it runs; e
   const p2 = await load(k2);
   const r2 = await p2.screenEvent({ name: "checkNow", state: {} });
   assert.match(r2.state.notice[0], /hace poco/);
-});
-
-test("setup: Configurar asks Kino to set the plugin up", async () => {
-  const kino = fakeKino();
-  const p = await load(kino);
-  await p.screenEvent({ name: "setupPlugin", arg: HDFULL, state: {} });
-  assert.ok(kino.calls.some((c) => c[0] === "setup" && c[1] === HDFULL));
 });
 
 test("search: shown here, one plugin at a time, cards open in the plugin that found them", async () => {

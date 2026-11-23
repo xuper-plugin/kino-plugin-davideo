@@ -1,5 +1,5 @@
-// The plugins Da-Video knows how to offer: each is a repository of xuper-plugin. `setup: true` marks one with a setup step
-// Kino runs (its manifest's `setup` block), so Da-Video can show Configurar. Kino Resolver is the heart: most of them play
+// The plugins Da-Video knows how to offer: each is a repository of xuper-plugin. Kino says which of them still needs setting up
+// (kino.manage.updates), so Da-Video can show Configurar. Kino Resolver is the heart: most of them play
 // through it.
 
 export const OWNER = "xuper-plugin";
@@ -7,13 +7,17 @@ export const OWNER = "xuper-plugin";
 export const RESOLVER = { repo: "xuper-plugin/kino-plugin-kino-resolver", name: "Kino Resolver" };
 
 export const PLUGINS = [
+  // Preferred first (owner, 2026-11-23): Xuper, Movie+, ZappTV, HDFull; then the rest.
+  { repo: "xuper-plugin/kino-plugin-xuper", name: "Xuper", kind: "live" },
+  { repo: "xuper-plugin/kino-plugin-movieplus", name: "Movie+", kind: "movies" },
+  { repo: "xuper-plugin/kino-plugin-zapptv", name: "ZappTV", kind: "live" },
+  { repo: "xuper-plugin/kino-plugin-hdfull", name: "HDFull", kind: "movies" },
   { repo: "xuper-plugin/kino-plugin-animes-es", name: "AnimES", kind: "anime" },
   { repo: "xuper-plugin/kino-plugin-cinehdplus", name: "CineHD Plus", kind: "movies" },
   { repo: "xuper-plugin/kino-plugin-cinemitas", name: "Cinemitas", kind: "movies" },
   { repo: "xuper-plugin/kino-plugin-cuevanapro", name: "Cuevana Pro", kind: "movies" },
   { repo: "xuper-plugin/kino-plugin-doramasyt", name: "DoramasYT", kind: "series" },
   { repo: "xuper-plugin/kino-plugin-embed69", name: "Embed 69", kind: "movies" },
-  { repo: "xuper-plugin/kino-plugin-hdfull", name: "HDFull", kind: "movies", setup: true },
   { repo: "xuper-plugin/kino-plugin-lacartoons", name: "LA Cartoons Plus", kind: "kids" },
   { repo: "xuper-plugin/kino-plugin-latino", name: "Latino", kind: "movies" },
   { repo: "xuper-plugin/kino-plugin-mundodonghua", name: "MundoDonghua", kind: "anime" },
@@ -27,8 +31,6 @@ export const PLUGINS = [
   { repo: "xuper-plugin/kino-plugin-sololatino", name: "SoloLatino", kind: "movies" },
   { repo: "xuper-plugin/kino-plugin-latanime", name: "TodoAnime", kind: "anime" },
   { repo: "xuper-plugin/kino-plugin-verpelis", name: "VerPelis", kind: "movies" },
-  { repo: "xuper-plugin/kino-plugin-xuper", name: "Xuper", kind: "live" },
-  { repo: "xuper-plugin/kino-plugin-zapptv", name: "ZappTV", kind: "live" },
 ];
 
 /** The icon a card shows: the plugin's own icon.png on its default branch (a public https picture needs no host). */
