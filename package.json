@@ -1,0 +1,16 @@
+{
+  "name": "kino-plugin-davideo",
+  "private": true,
+  "type": "module",
+  "description": "Da-Video: all of xuper-plugin's video plugins in one place. Source in src/ (page.js, catalog.js and the standard screen in src/std), bundled into plugin.js.",
+  "license": "Apache-2.0",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "check:built": "node scripts/build.mjs --check",
+    "test": "node --test test/*.test.mjs",
+    "validate": "node scripts/build.mjs && node sdk/validate.mjs . --repo xuper-plugin/kino-plugin-davideo"
+  },
+  "devDependencies": {
+    "esbuild": "^0.21.0"
+  }
+}

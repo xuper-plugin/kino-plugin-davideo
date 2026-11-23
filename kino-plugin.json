@@ -1,0 +1,58 @@
+{
+  "id": "davideo",
+  "name": "Da-Video",
+  "version": "0.1.0",
+  "apiVersion": 31,
+  "entry": "plugin.js",
+  "icon": "icon.png",
+  "description": "Todos tus plugins de video en uno: busca en los que tienes, instala los que faltan, configúralos y mantenlos al día solos.",
+  "author": "xuper-plugin",
+  "homepage": "https://github.com/xuper-plugin/kino-plugin-davideo",
+  "discoverable": false,
+  "hosts": [],
+  "capabilities": [
+    "screen",
+    "schedule",
+    "manage"
+  ],
+  "screen": {
+    "label": "Da-Video",
+    "labelEn": "Da-Video",
+    "icon": "movie",
+    "menuOpens": "screen",
+    "opensFrom": [
+      "menu"
+    ]
+  },
+  "jobs": [
+    {
+      "id": "update",
+      "label": {
+        "es": "Actualizar mis plugins",
+        "en": "Update my plugins"
+      },
+      "everyMin": 240,
+      "everyOptions": [
+        240,
+        300,
+        360
+      ]
+    }
+  ],
+  "recommends": [
+    "xuper-plugin/kino-plugin-kino-resolver"
+  ],
+  "consumes": {
+    "mine": {
+      "author": "xuper-plugin",
+      "door": "catalog",
+      "calls": [
+        "search"
+      ]
+    }
+  },
+  "signature": {
+    "authorKey": "6693946bd5c56196960959c4b9665fad5094374bcb85ddb282f8bf762c835263",
+    "value": "47709a5b72816a136432fa011250d8bfb689f2dbb0f42fe620092f5d39c318ad5241e950e20f1edc8c6c561f9f475fcde2c5c8717c250fc231c4d2a3c83d470c"
+  }
+}
