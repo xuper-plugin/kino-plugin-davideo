@@ -210,13 +210,15 @@ var rail = (r, key, words, headers) => ({
   items: r.items,
   ...withHeaders(headers)
 });
-function browseView(cfg, { tab, data, recent, pending, failed, searching = false, device = "phone", own = null }) {
+function browseView(cfg, { tab, data, recent, pending, failed, searching = false, device = "phone", own = null, ownActions = [] }) {
   const tv = device === "tv";
   const tabs = own ? [cfg.tabs[0]] : cfg.tabs;
   const active = tabs.some((t) => t.id === tab) ? tab : tabs[0].id;
   const withTabs = tabs.length > 1;
   const body = [];
-  if (own) {
+  const ownBlocks = own && !Array.isArray(own) && Array.isArray(own.blocks) ? own.blocks : null;
+  if (ownBlocks) {
+  } else if (own) {
     body.push(...own);
   } else if (data) {
     const h = cfg.imageHeaders;
@@ -255,6 +257,8 @@ function browseView(cfg, { tab, data, recent, pending, failed, searching = false
     actions: [
       // barSearch: false (std 1.7.0): the plugin draws its own search field in its page instead of the bar's icon.
       ...cfg.barSearch ? [iconButton("searchButton", "search", "search", { ui: searchOpenOps(tabsInBar), event: "searchOpened" })] : [],
+      // std 1.9.0: the page's own bar buttons (page.actions), before the settings gear.
+      ...Array.isArray(ownActions) ? ownActions : [],
       iconButton("settingsButton", "settings", "settings", "openSettings")
     ]
   });
@@ -264,7 +268,7 @@ function browseView(cfg, { tab, data, recent, pending, failed, searching = false
     appBar,
     body: { type: "Column", key: "page", children: [
       ...withTabs && !tv ? [{ type: "Column", key: "tabsRow", padding: { compact: 0, expanded: 24 }, children: [tabBar(tabs, active)] }] : [],
-      { type: "SingleChildScrollView", key: "browse-" + active, flex: 1, children: [...banner ? [banner] : [], { type: "Column", padding: { compact: 12, expanded: 24 }, gap: 16, children: body }] }
+      { type: "SingleChildScrollView", key: "browse-" + active, flex: 1, children: ownBlocks ? ownBlocks.filter((b) => b && Array.isArray(b.nodes) && b.nodes.length).flatMap((b, i) => b.edge ? b.nodes : [{ type: "Column", key: "block-" + i, padding: { compact: 12, expanded: 24 }, gap: 16, crossAxisAlignment: "stretch", children: b.nodes }]) : [...banner ? [banner] : [], { type: "Column", padding: { compact: 12, expanded: 24 }, gap: 16, children: body }] }
     ] },
     ...pending ? { every: { ms: POLL_MS, event: "tick" } } : {}
   };
@@ -430,9 +434,38 @@ var INFLIGHT_KEY = "std:inflight";
 var INFLIGHT_STALE_MS = 18e3;
 var MAX_META_TICKS = 10;
 var DEFAULT_TABS = [{ id: "inicio", label: "Inicio", labelEn: "Home" }];
-function makeStandardScreen({ kino, name, nameEn, logo = null, logoAspect = "1:1", needsResolver, hasSettings, tabs, loadTab, homeKey = null, titleOf: titleOf3, typeOf, tmdbPictures = false, imageHeaders = null, searchHere = null, page = null, barSearch = true, backArrow = true }) {
+var SNAPSHOT_VERSION = 1;
+var SNAPSHOT_MAX_AGE_MS = 24 * 60 * 60 * 1e3;
+var SNAPSHOT_TIMEOUT_MS = 8e3;
+var snapshotUrl = (repo, tab) => "https://raw.githubusercontent.com/" + repo + "/main/home/" + encodeURIComponent(tab) + ".json";
+function snapshotRows(text2, tab, now = Date.now()) {
+  let o;
+  try {
+    o = JSON.parse(String(text2));
+  } catch (_) {
+    return null;
+  }
+  if (!o || o.v !== SNAPSHOT_VERSION || o.tab !== tab || !Array.isArray(o.rows) || o.rows.length === 0) return null;
+  const at = Number(o.at);
+  if (!Number.isFinite(at) || now - at > SNAPSHOT_MAX_AGE_MS || at - now > 60 * 60 * 1e3) return null;
+  return o.rows;
+}
+var lastSource = null;
+function makeStandardScreen({ kino, name, nameEn, logo = null, logoAspect = "1:1", needsResolver, hasSettings, tabs, loadTab, homeKey = null, titleOf: titleOf3, typeOf, tmdbPictures = false, imageHeaders = null, searchHere = null, page = null, barSearch = true, backArrow = true, snapshot = null }) {
   const cfg = { name, nameEn, logo, logoAspect, imageHeaders, hasSettings: !!hasSettings, barSearch: barSearch !== false, backArrow: backArrow !== false, tabs: Array.isArray(tabs) && tabs.length > 0 ? tabs : DEFAULT_TABS };
   const TAB_IDS = cfg.tabs.map((t) => t.id);
+  lastSource = { tabs: cfg.tabs, loadTab, titleOf: titleOf3, typeOf };
+  async function fromSnapshot(tab) {
+    if (typeof snapshot !== "string" || !/^[\w.-]+\/[\w.-]+$/.test(snapshot)) return null;
+    try {
+      const r = await kino.fetch(snapshotUrl(snapshot, tab), { timeoutMs: SNAPSHOT_TIMEOUT_MS });
+      if (!r || !r.ok) return null;
+      const rows = snapshotRows(await r.text(), tab);
+      return rows ? { rows } : null;
+    } catch (_) {
+      return null;
+    }
+  }
   const meta = makeMetaCache({ kino, titleOf: titleOf3, typeOf, tmdbPictures });
   function slidesFromMeta(rails) {
     const out = [];
@@ -576,7 +609,17 @@ function makeStandardScreen({ kino, name, nameEn, logo = null, logoAspect = "1:1
     const pending = Array.isArray(st.pending) && st.pending.length > 0;
     const searching = st.searching === true;
     if (page) {
-      const tree = browseView(cfg, { tab: TAB_IDS[0], data: null, recent: [], pending: false, failed: false, searching, device, own: page.view({ ...c, state: st }) || [] });
+      const tree = browseView(cfg, {
+        tab: TAB_IDS[0],
+        data: null,
+        recent: [],
+        pending: false,
+        failed: false,
+        searching,
+        device,
+        own: page.view({ ...c, state: st }) || [],
+        ownActions: page.actions ? page.actions({ ...c, state: st }) || [] : []
+      });
       const every = page.every ? page.every({ ...c, state: st }) : null;
       return every ? { ...tree, every } : tree;
     }
@@ -597,7 +640,7 @@ function makeStandardScreen({ kino, name, nameEn, logo = null, logoAspect = "1:1
     set(INFLIGHT_KEY, JSON.stringify({ tab, at: Date.now() }));
     let page2;
     try {
-      page2 = await loadTab(tab);
+      page2 = await fromSnapshot(tab) || await loadTab(tab);
     } finally {
       try {
         kino.storage.remove(INFLIGHT_KEY);
@@ -940,7 +983,21 @@ var statusState = (st) => {
   lastStatus = st;
   return { mp: st, jobOn: jobIsOn(), busy: st.running };
 };
+var tabOf2 = (state, st) => contentPlugins(st).length > 0 && !(state && state.dvTab === "mine") ? "content" : "mine";
+function pageActions({ state }) {
+  const st = state && state.mp;
+  if (!st) return [];
+  const content = tabOf2(state, st) === "content";
+  const [es, en] = content ? ["Recargar contenido", "Reload content"] : st.running ? ["Actualizando…", "Updating…"] : ["Buscar actualizaciones", "Check for updates"];
+  return [{ type: "IconButton", key: "reload", icon: "refresh", labelText: es, labelTextEn: en, tooltip: es, tooltipEn: en, onPressed: { event: "reload" } }];
+}
 var PAGE_EVENTS = {
+  // The bar's reload: Contenido fetches the shared Home again; Mis plugins checks for updates (and installs them), as before.
+  async reload({ state }) {
+    const st = state && state.mp || lastStatus;
+    if (tabOf2(state, st) === "content") return { state: { contentLoading: true } };
+    return startPass(null);
+  },
   // The two tabs (shown once a plugin with a ready Home is installed): Mis plugins and Contenido.
   dvTab({ value, arg }) {
     const tab = value === "content" || arg === "content" ? "content" : "mine";
@@ -1098,7 +1155,7 @@ function pageView({ state }) {
   if (!st) return [...nodes, { type: "Skeleton", key: "loading", shape: "block", height: 160 }];
   lastStatus = st;
   if (contentPlugins(st).length > 0) {
-    const tab = state.dvTab === "mine" ? "mine" : "content";
+    const tab = tabOf2(state, st);
     nodes.push({
       type: "TabBar",
       key: "dvTabs",
@@ -1108,8 +1165,10 @@ function pageView({ state }) {
       tabs: [{ value: "content", label: "Contenido", labelEn: "Content" }, { value: "mine", label: "Mis plugins", labelEn: "My plugins" }]
     });
     if (tab === "content") {
-      nodes.push(...contentView(keptContent(), state.contentLoading === true));
-      return [{ type: "Column", key: "dvPage", crossAxisAlignment: "stretch", padding: { compact: 16, expanded: 24 }, gap: 16, children: nodes }];
+      const all2 = contentView(keptContent(), state.contentLoading === true);
+      const isHero = (n) => n && (n.type === "heroCard" || n.type === "PageView" && String(n.key).startsWith("dvHero") || n.key === "contentHeroWait");
+      const hero2 = all2.filter(isHero);
+      return { blocks: [{ nodes }, { edge: true, nodes: hero2 }, { nodes: all2.filter((n) => !isHero(n)) }] };
     }
   }
   if (!st.ok) {
@@ -1132,16 +1191,13 @@ function pageView({ state }) {
   const installed = all.filter((p) => st.plugins[p.repo]);
   const missing = all.filter((p) => !st.plugins[p.repo]);
   const updates = installed.filter((p) => st.plugins[p.repo].available).length;
-  nodes.push({ type: "Row", key: "mineHead", gap: 4, crossAxisAlignment: "center", children: [
-    text("mineTitle", "Tus plugins", "Your plugins", { style: "h5", weight: 1 }),
-    iconBtn(
-      "checkNow",
-      "refresh",
-      st.running ? "Actualizando…" : updates ? `Actualizar ${updates}` : "Buscar actualizaciones",
-      st.running ? "Updating…" : updates ? `Update ${updates}` : "Check for updates",
-      { event: "checkNow" }
-    )
-  ] });
+  if (st.running) nodes.push(text("mineRunning", "Actualizando tus plugins…", "Updating your plugins…", { color: "muted" }));
+  else if (updates) nodes.push(text(
+    "mineUpdates",
+    `Hay ${updates} ${updates === 1 ? "actualización" : "actualizaciones"}: toca ⟳ arriba para instalarlas.`,
+    `${updates} ${updates === 1 ? "update is" : "updates are"} out: tap ⟳ above to install them.`,
+    { color: "muted" }
+  ));
   if (installed.length) nodes.push(grid("mineGrid", installed.map((p) => pluginTile(p, st.plugins[p.repo], all.indexOf(p)))));
   else nodes.push(text("mineEmpty", "Todavía no tienes ninguno. Instala uno de abajo.", "You don't have any yet. Install one below.", { color: "muted" }));
   if (missing.length) {
@@ -1189,6 +1245,7 @@ var standard = () => std ?? (std = makeStandardScreen({
       return { mp, jobOn: jobIsOn(), busy: mp.running, notice: null, contentLoading: contentWanted(mp) };
     },
     view: pageView,
+    actions: pageActions,
     every: pageEvery,
     events: PAGE_EVENTS
   }

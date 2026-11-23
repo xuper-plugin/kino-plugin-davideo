@@ -234,6 +234,10 @@ test("Contenido: the tab shows once a plugin with a ready Home is installed, bui
   assert.equal(rail.items[0].origin, "xuper-plugin/kino-plugin-seriesflix", "the installed copy, not SeriesKao's");
   assert.equal(rail.items[0].ref, "r:1");
   assert.ok(byKey(t, "dvslide-" + rail.items[0].id), "the slide is the rail's card");
+  // The slider runs edge to edge: a direct child of the scroll view, outside the padded blocks.
+  const scroll = nodes(t).find((n) => n.type === "SingleChildScrollView");
+  assert.ok(scroll.children.some((n) => n.key === "dvslide-" + rail.items[0].id || String(n.key).startsWith("dvHero")));
+  assert.ok(scroll.children.filter((n) => n.type === "Column").every((c) => c.padding));
   assert.ok(!byKey(t, "mineGrid"), "Contenido replaces the plugins grid");
   assert.deepEqual(kit.checkScreenTree(fold(t), "es", undefined, { apiVersion: 31 }).dropped, []);
 });
@@ -260,4 +264,21 @@ test("Contenido: a Home kept without a slider is asked again after 2 minutes, a 
   store.set(mod2.CACHE_KEY, JSON.stringify({ at: now - 3 * 60 * 1000, repos: ["a/b"], slides: [{ id: "x" }], rails: [] }));
   assert.equal(mod2.contentStale(["a/b"], now), false);
   assert.ok(contentStale && CACHE_KEY);
+});
+
+test("the bar's reload, beside the gear: Contenido fetches its Home again, Mis plugins checks for updates; no «Tus plugins» title", async () => {
+  const kino = fakeKino();
+  const p = await load(kino);
+  const o = await p.screenEvent({ name: "open", state: {}, device: "phone", route: { name: "main" } });
+  const t = await p.screen({ state: o.state, device: "phone", installed: {} });
+  const actions = t.appBar.actions.map((a) => a.key);
+  assert.deepEqual(actions.slice(-2), ["reload", "settingsButton"], "reload right before the gear");
+  assert.equal(byKey(t, "reload").labelText, "Recargar contenido");
+  assert.deepEqual(await p.screenEvent({ name: "reload", state: o.state }), { state: { contentLoading: true } });
+  const mine = { ...o.state, dvTab: "mine" };
+  const tm = await p.screen({ state: mine, device: "phone", installed: {} });
+  assert.equal(byKey(tm, "reload").labelText, "Buscar actualizaciones");
+  assert.ok(!byKey(tm, "mineTitle") && !byKey(tm, "mineHead"));
+  await p.screenEvent({ name: "reload", state: mine });
+  assert.ok(kino.calls.some((c) => c[0] === "updateAll"), "Mis plugins: a pass, as the old button did");
 });

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.5
+
+- The reload button sits in the bar beside the gear: on Contenido it fetches the content again, on Mis plugins it checks for updates. No «Tus plugins» title (the tab says it).
+- Contenido's slider runs edge to edge (std 1.9.1 page blocks).
+
 ## 0.4.4
 
 - Contenido is the first tab and opens by default when one of your plugins keeps a ready Home.

@@ -49,8 +49,26 @@ export function contentWanted(st) {
 let lastStatus = null;
 const statusState = (st) => { lastStatus = st; return { mp: st, jobOn: jobIsOn(), busy: st.running }; };
 
+/** The tab shown: Contenido when a plugin with a ready Home is installed, unless the person picked Mis plugins. */
+const tabOf = (state, st) => (contentPlugins(st).length > 0 && !(state && state.dvTab === "mine") ? "content" : "mine");
+
+/** The bar's own button (std's `page.actions`), beside the gear: reload what the tab shows. */
+export function pageActions({ state }) {
+  const st = state && state.mp;
+  if (!st) return [];
+  const content = tabOf(state, st) === "content";
+  const [es, en] = content ? ["Recargar contenido", "Reload content"] : st.running ? ["Actualizando…", "Updating…"] : ["Buscar actualizaciones", "Check for updates"];
+  return [{ type: "IconButton", key: "reload", icon: "refresh", labelText: es, labelTextEn: en, tooltip: es, tooltipEn: en, onPressed: { event: "reload" } }];
+}
+
 /** The page's events (std's `page.events`). */
 export const PAGE_EVENTS = {
+  // The bar's reload: Contenido fetches the shared Home again; Mis plugins checks for updates (and installs them), as before.
+  async reload({ state }) {
+    const st = (state && state.mp) || lastStatus;
+    if (tabOf(state, st) === "content") return { state: { contentLoading: true } };
+    return startPass(null);
+  },
   // The two tabs (shown once a plugin with a ready Home is installed): Mis plugins and Contenido.
   dvTab({ value, arg }) {
     const tab = value === "content" || arg === "content" ? "content" : "mine";
@@ -205,12 +223,15 @@ export function pageView({ state }) {
   // With a plugin whose repository keeps a ready Home installed, two tabs: Mis plugins (this page) and Contenido.
   if (contentPlugins(st).length > 0) {
     // Contenido first, and the one shown until the person picks Mis plugins (owner, 2026-11-23).
-    const tab = state.dvTab === "mine" ? "mine" : "content";
+    const tab = tabOf(state, st);
     nodes.push({ type: "TabBar", key: "dvTabs", divider: false, value: tab, onChanged: "dvTab",
       tabs: [{ value: "content", label: "Contenido", labelEn: "Content" }, { value: "mine", label: "Mis plugins", labelEn: "My plugins" }] });
     if (tab === "content") {
-      nodes.push(...contentView(keptContent(), state.contentLoading === true));
-      return [{ type: "Column", key: "dvPage", crossAxisAlignment: "stretch", padding: { compact: 16, expanded: 24 }, gap: 16, children: nodes }];
+      // Blocks (std 1.9.1): the search and the tabs, then the slider edge to edge, then the rows.
+      const all = contentView(keptContent(), state.contentLoading === true);
+      const isHero = (n) => n && (n.type === "heroCard" || (n.type === "PageView" && String(n.key).startsWith("dvHero")) || n.key === "contentHeroWait");
+      const hero = all.filter(isHero);
+      return { blocks: [{ nodes }, { edge: true, nodes: hero }, { nodes: all.filter((n) => !isHero(n)) }] };
     }
   }
   if (!st.ok) {
@@ -232,11 +253,10 @@ export function pageView({ state }) {
   const installed = all.filter((p) => st.plugins[p.repo]);
   const missing = all.filter((p) => !st.plugins[p.repo]);
   const updates = installed.filter((p) => st.plugins[p.repo].available).length;
-  nodes.push({ type: "Row", key: "mineHead", gap: 4, crossAxisAlignment: "center", children: [
-    text("mineTitle", "Tus plugins", "Your plugins", { style: "h5", weight: 1 }),
-    iconBtn("checkNow", "refresh", st.running ? "Actualizando…" : updates ? `Actualizar ${updates}` : "Buscar actualizaciones",
-      st.running ? "Updating…" : updates ? `Update ${updates}` : "Check for updates", { event: "checkNow" }),
-  ] });
+  // No title of its own (the tab says it): the bar's reload button checks for updates; a line says so while a pass runs.
+  if (st.running) nodes.push(text("mineRunning", "Actualizando tus plugins…", "Updating your plugins…", { color: "muted" }));
+  else if (updates) nodes.push(text("mineUpdates", `Hay ${updates} ${updates === 1 ? "actualización" : "actualizaciones"}: toca ⟳ arriba para instalarlas.`,
+    `${updates} ${updates === 1 ? "update is" : "updates are"} out: tap ⟳ above to install them.`, { color: "muted" }));
   if (installed.length) nodes.push(grid("mineGrid", installed.map((p) => pluginTile(p, st.plugins[p.repo], all.indexOf(p)))));
   else nodes.push(text("mineEmpty", "Todavía no tienes ninguno. Instala uno de abajo.", "You don't have any yet. Install one below.", { color: "muted" }));
   if (missing.length) {
