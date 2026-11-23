@@ -73,7 +73,7 @@ export const PAGE_EVENTS = {
   dvTab({ value, arg }) {
     const tab = value === "content" || arg === "content" ? "content" : "mine";
     const plugins = contentPlugins(lastStatus);
-    return { state: { dvTab: tab, contentLoading: tab === "content" && plugins.length > 0 && contentStale(plugins.map((x) => x.repo)) } };
+    return { state: { dvTab: tab, notice: null, contentLoading: tab === "content" && plugins.length > 0 && contentStale(plugins.map((x) => x.repo)) } };
   },
   // One build of the Contenido Home (the files of the installed plugins), asked by the page's timer.
   async contentLoad() {
@@ -217,7 +217,6 @@ export function pageView({ state }) {
   // The search, Google-like, on top: it asks every one of your plugins (std's searchHere).
   nodes.push({ type: "TextField", key: "dvSearch", kind: "search", maxLength: 200, hintText: "Buscar película o serie", hintTextEn: "Search a movie or a series",
     onSubmitted: "search", trailingIcon: "search", trailingLabel: "Buscar", trailingLabelEn: "Search", onTrailingTap: "search" });
-  if (state && Array.isArray(state.notice)) nodes.push(text("notice", state.notice[0], state.notice[1], { color: "primary" }));
   if (!st) return [...nodes, { type: "Skeleton", key: "loading", shape: "block", height: 160 }];
   lastStatus = st;
   // With a plugin whose repository keeps a ready Home installed, two tabs: Mis plugins (this page) and Contenido.
@@ -234,6 +233,8 @@ export function pageView({ state }) {
       return { blocks: [{ nodes }, { edge: true, nodes: hero }, { nodes: all.filter((n) => !isHero(n)) }] };
     }
   }
+  // The update pass's line (rate limited, done…) belongs to Mis plugins: under its tab, never on Contenido.
+  if (state && Array.isArray(state.notice)) nodes.push(text("notice", state.notice[0], state.notice[1], { color: "primary" }));
   if (!st.ok) {
     const why = st.code === "old_kino"
       ? ["Actualiza Kino para que Da-Video pueda ver y mantener al día tus plugins.", "Update Kino so Da-Video can see your plugins and keep them up to date."]

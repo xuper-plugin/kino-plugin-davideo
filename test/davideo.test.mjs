@@ -282,3 +282,16 @@ test("the bar's reload, beside the gear: Contenido fetches its Home again, Mis p
   await p.screenEvent({ name: "reload", state: mine });
   assert.ok(kino.calls.some((c) => c[0] === "updateAll"), "Mis plugins: a pass, as the old button did");
 });
+
+test("the update pass's line shows on Mis plugins only, under the tabs, and goes when the tab changes", async () => {
+  const kino = fakeKino();
+  const p = await load(kino);
+  const o = await p.screenEvent({ name: "open", state: {}, device: "phone", route: { name: "main" } });
+  const notice = ["Ya revisamos hace poco. Intenta de nuevo en unos minutos.", "We just checked."];
+  const tc = await p.screen({ state: { ...o.state, notice }, device: "phone", installed: {} });
+  assert.ok(!byKey(tc, "notice"), "not on Contenido");
+  const tm = await p.screen({ state: { ...o.state, notice, dvTab: "mine" }, device: "phone", installed: {} });
+  const all = nodes(tm).map((n) => n.key);
+  assert.ok(all.indexOf("notice") > all.indexOf("dvTabs"), "under the tabs");
+  assert.equal((await p.screenEvent({ name: "dvTab", value: "content", state: o.state })).state.notice, null);
+});

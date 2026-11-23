@@ -1002,7 +1002,7 @@ var PAGE_EVENTS = {
   dvTab({ value, arg }) {
     const tab = value === "content" || arg === "content" ? "content" : "mine";
     const plugins = contentPlugins(lastStatus);
-    return { state: { dvTab: tab, contentLoading: tab === "content" && plugins.length > 0 && contentStale(plugins.map((x) => x.repo)) } };
+    return { state: { dvTab: tab, notice: null, contentLoading: tab === "content" && plugins.length > 0 && contentStale(plugins.map((x) => x.repo)) } };
   },
   // One build of the Contenido Home (the files of the installed plugins), asked by the page's timer.
   async contentLoad() {
@@ -1151,7 +1151,6 @@ function pageView({ state }) {
     trailingLabelEn: "Search",
     onTrailingTap: "search"
   });
-  if (state && Array.isArray(state.notice)) nodes.push(text("notice", state.notice[0], state.notice[1], { color: "primary" }));
   if (!st) return [...nodes, { type: "Skeleton", key: "loading", shape: "block", height: 160 }];
   lastStatus = st;
   if (contentPlugins(st).length > 0) {
@@ -1171,6 +1170,7 @@ function pageView({ state }) {
       return { blocks: [{ nodes }, { edge: true, nodes: hero2 }, { nodes: all2.filter((n) => !isHero(n)) }] };
     }
   }
+  if (state && Array.isArray(state.notice)) nodes.push(text("notice", state.notice[0], state.notice[1], { color: "primary" }));
   if (!st.ok) {
     const why = st.code === "old_kino" ? ["Actualiza Kino para que Da-Video pueda ver y mantener al día tus plugins.", "Update Kino so Da-Video can see your plugins and keep them up to date."] : ["Kino todavía no dejó a Da-Video revisar tus plugins. Revisa sus permisos en Plugins.", "Kino hasn't let Da-Video look at your plugins yet. Check its permissions in Plugins."];
     nodes.push(text("noManage", why[0], why[1], { color: "muted" }));

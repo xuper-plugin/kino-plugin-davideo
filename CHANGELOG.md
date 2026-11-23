@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.6
+
+- The update pass's line («Ya revisamos hace poco…») shows on Mis plugins only, under the tabs, and goes when you switch tab.
+
 ## 0.4.5
 
 - The reload button sits in the bar beside the gear: on Contenido it fetches the content again, on Mis plugins it checks for updates. No «Tus plugins» title (the tab says it).
