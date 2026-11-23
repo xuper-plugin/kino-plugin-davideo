@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.2
+
+- Card spacing on Kino's scale and a Kino icon on Actualizar (nothing dropped)
+
 ## 0.1.1
 
 - The plugin cards show their name, version and buttons (a Card takes children, not child)

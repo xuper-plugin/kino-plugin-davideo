@@ -124,11 +124,11 @@ function pluginCard(entry, row, last, i) {
   if (!row) {
     buttons.push({ type: "ElevatedButton", key: `install-${i}`, icon: "download", ...label("Instalar", "Install"), onPressed: { go: { installPlugin: { repo: entry.repo } } } });
   } else {
-    if (row.available) buttons.push({ type: "ElevatedButton", key: `update-${i}`, icon: "update", ...label("Actualizar", "Update"), onPressed: { event: "updateOne", arg: entry.repo } });
+    if (row.available) buttons.push({ type: "ElevatedButton", key: `update-${i}`, icon: "refresh", ...label("Actualizar", "Update"), onPressed: { event: "updateOne", arg: entry.repo } });
     if (entry.setup && row.setupReady === false && !row.setupRunning) buttons.push({ type: "ElevatedButton", key: `setup-${i}`, icon: "settings", ...label("Configurar", "Set up"), onPressed: { event: "setupPlugin", arg: entry.repo } });
     buttons.push({ type: "TextButton", key: `open-${i}`, ...label("Abrir", "Open"), onPressed: { go: { plugin: { repo: entry.repo } } } });
   }
-  return { type: "Card", key: `card-${i}`, children: [{ type: "Column", padding: 12, gap: 6, children: [...lines, { type: "Row", key: `actions-${i}`, gap: 8, children: buttons }] }] };
+  return { type: "Card", key: `card-${i}`, children: [{ type: "Column", padding: 12, gap: 8, children: [...lines, { type: "Row", key: `actions-${i}`, gap: 8, children: buttons }] }] };
 }
 
 /** The page's nodes (std's `page.view`). */
