@@ -902,7 +902,7 @@ function pluginCard(entry, row, last, i) {
     if (entry.setup && row.setupReady === false && !row.setupRunning) buttons.push({ type: "ElevatedButton", key: `setup-${i}`, icon: "settings", ...label("Configurar", "Set up"), onPressed: { event: "setupPlugin", arg: entry.repo } });
     buttons.push({ type: "TextButton", key: `open-${i}`, ...label("Abrir", "Open"), onPressed: { go: { plugin: { repo: entry.repo } } } });
   }
-  return { type: "Card", key: `card-${i}`, child: { type: "Column", padding: 12, gap: 6, children: [...lines, { type: "Row", key: `actions-${i}`, gap: 8, children: buttons }] } };
+  return { type: "Card", key: `card-${i}`, children: [{ type: "Column", padding: 12, gap: 6, children: [...lines, { type: "Row", key: `actions-${i}`, gap: 8, children: buttons }] }] };
 }
 function pageView({ state }) {
   const st = state && state.mp;
@@ -914,7 +914,7 @@ function pageView({ state }) {
     nodes.push(text("noManage", why[0], why[1], { color: "muted" }));
   }
   if (state.jobOn === false) {
-    nodes.push({ type: "Card", key: "autoCard", child: { type: "Column", padding: 12, gap: 8, children: [
+    nodes.push({ type: "Card", key: "autoCard", children: [{ type: "Column", padding: 12, gap: 8, children: [
       text("autoOffTitle", "Actualizaciones automáticas: apagadas", "Automatic updates: off", { style: "h5" }),
       text(
         "autoOffText",
@@ -923,7 +923,7 @@ function pageView({ state }) {
         { color: "muted" }
       ),
       { type: "ElevatedButton", key: "enableAuto", icon: "sync", ...label("Activar", "Turn on"), onPressed: { event: "enableAuto" } }
-    ] } });
+    ] }] });
   }
   const lastOf = (repo) => (st.lastResult || []).find((r) => r && r.repo === repo);
   nodes.push(text("heartTitle", "El corazón", "The heart", { style: "h4" }));
@@ -931,10 +931,10 @@ function pageView({ state }) {
   nodes.push(pluginCard(RESOLVER, st.plugins[RESOLVER.repo], lastOf(RESOLVER.repo), 0));
   const mine = PLUGINS.filter((p) => st.plugins[p.repo]);
   const missing = PLUGINS.filter((p) => !st.plugins[p.repo]);
-  nodes.push({ type: "Row", key: "mineHead", gap: 8, children: [
-    text("mineTitle", "Tus plugins", "Your plugins", { style: "h4" }),
+  nodes.push(text("mineTitle", "Tus plugins", "Your plugins", { style: "h4" }));
+  nodes.push(
     { type: "TextButton", key: "checkNow", icon: "refresh", ...label(st.running ? "Actualizando…" : "Buscar actualizaciones", st.running ? "Updating…" : "Check for updates"), onPressed: { event: "checkNow" } }
-  ] });
+  );
   if (!mine.length) nodes.push(text("mineEmpty", "Todavía no tienes ninguno. Instala uno de abajo.", "You don't have any yet. Install one below.", { color: "muted" }));
   mine.forEach((p, i) => nodes.push(pluginCard(p, st.plugins[p.repo], lastOf(p.repo), i + 1)));
   if (missing.length) {
