@@ -1,7 +1,7 @@
 {
   "id": "davideo",
   "name": "Da-Video",
-  "version": "0.4.10",
+  "version": "0.4.11",
   "apiVersion": 31,
   "entry": "plugin.js",
   "icon": "icon.png",
@@ -63,6 +63,6 @@
   },
   "signature": {
     "authorKey": "6693946bd5c56196960959c4b9665fad5094374bcb85ddb282f8bf762c835263",
-    "value": "2644eb6381a36092d21a426b64d1343940ca4302b793f642ef84b4732d792447a5ee01878daa90246ff582451a0d89e97ef0038bbfaf4a4019beba6edcf77300"
+    "value": "b073c06b65aa8a1fa72c245180c46072a0af621d54ef2b1f5ff939c9be9afa1c244a5c3b18dabb3966b691b5295a7550a2b4ba70313ce8a761ee735942340804"
   }
 }
