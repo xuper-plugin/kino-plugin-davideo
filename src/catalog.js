@@ -25,8 +25,9 @@ export const PLUGINS = [
   { repo: "xuper-plugin/kino-plugin-hentaimama", name: "HentaiMama (+18)", kind: "adult" },
   { repo: "xuper-plugin/kino-plugin-lacartoons", name: "LA Cartoons Plus", kind: "kids", needsResolver: true, snapshot: true },
   { repo: "xuper-plugin/kino-plugin-latino", name: "Latino", kind: "movies", needsResolver: true, snapshot: true },
-  // Japanese anime from its own server (no resolver), catalog from TMDB; its catalog door (1.1.2) answers the search.
-  { repo: "xuper-plugin/kino-plugin-megaplay", name: "MegaPlay", kind: "anime" },
+  // Japanese anime from its own server (no resolver), catalog from TMDB; its catalog door (1.1.2) answers the search and its
+  // own Action keeps a ready Home (1.2.0), so it is part of Contenido.
+  { repo: "xuper-plugin/kino-plugin-megaplay", name: "MegaPlay", kind: "anime", snapshot: true },
   { repo: "xuper-plugin/kino-plugin-mundodonghua", name: "MundoDonghua", kind: "anime", needsResolver: true, snapshot: true },
   { repo: "xuper-plugin/maraton", name: "PelisYSeries", kind: "movies" },
   { repo: "xuper-plugin/kino-plugin-peliculasflix", name: "PeliculasFlix", kind: "movies", needsResolver: true, snapshot: true },
