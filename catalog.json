@@ -1,0 +1,193 @@
+{
+  "v": 1,
+  "searchFirst": [
+    "xuper-plugin/kino-plugin-hdfull",
+    "xuper-plugin/kino-plugin-ultrahd",
+    "xuper-plugin/kino-plugin-movieplus",
+    "xuper-plugin/kino-plugin-xuper",
+    "xuper-plugin/kino-plugin-zapptv"
+  ],
+  "plugins": [
+    {
+      "repo": "xuper-plugin/kino-plugin-xuper",
+      "name": "Xuper",
+      "kind": "live"
+    },
+    {
+      "repo": "xuper-plugin/kino-plugin-movieplus",
+      "name": "Movie+",
+      "kind": "movies"
+    },
+    {
+      "repo": "xuper-plugin/kino-plugin-zapptv",
+      "name": "ZappTV",
+      "kind": "live"
+    },
+    {
+      "repo": "xuper-plugin/kino-plugin-hdfull",
+      "name": "HDFull",
+      "kind": "movies",
+      "needsResolver": true
+    },
+    {
+      "repo": "xuper-plugin/kino-plugin-ultrahd",
+      "name": "Ultra Hd",
+      "kind": "movies"
+    },
+    {
+      "repo": "xuper-plugin/kino-plugin-animes-es",
+      "name": "AnimES",
+      "kind": "anime"
+    },
+    {
+      "repo": "xuper-plugin/kino-plugin-areadocumental",
+      "name": "Área Documental",
+      "kind": "docs"
+    },
+    {
+      "repo": "xuper-plugin/kino-plugin-cinehdplus",
+      "name": "CineHD Plus",
+      "kind": "movies",
+      "needsResolver": true,
+      "snapshot": true
+    },
+    {
+      "repo": "xuper-plugin/kino-plugin-cinejoy",
+      "name": "Cinejoy",
+      "kind": "movies"
+    },
+    {
+      "repo": "xuper-plugin/kino-plugin-cinemitas",
+      "name": "Cinemitas",
+      "kind": "movies",
+      "needsResolver": true,
+      "snapshot": true
+    },
+    {
+      "repo": "xuper-plugin/kino-plugin-cuevanapro",
+      "name": "Cuevana Pro",
+      "kind": "movies",
+      "needsResolver": true,
+      "snapshot": true
+    },
+    {
+      "repo": "xuper-plugin/kino-plugin-doramasyt",
+      "name": "DoramasYT",
+      "kind": "series",
+      "needsResolver": true,
+      "snapshot": true
+    },
+    {
+      "repo": "xuper-plugin/kino-plugin-embed69",
+      "name": "Embed 69",
+      "kind": "movies",
+      "needsResolver": true,
+      "snapshot": true
+    },
+    {
+      "repo": "xuper-plugin/kino-plugin-hentaimama",
+      "name": "HentaiMama (+18)",
+      "kind": "adult"
+    },
+    {
+      "repo": "xuper-plugin/kino-plugin-kisskh",
+      "name": "KissKH",
+      "kind": "series"
+    },
+    {
+      "repo": "xuper-plugin/kino-plugin-lacartoons",
+      "name": "LA Cartoons Plus",
+      "kind": "kids",
+      "needsResolver": true,
+      "snapshot": true
+    },
+    {
+      "repo": "xuper-plugin/kino-plugin-latino",
+      "name": "Latino",
+      "kind": "movies",
+      "needsResolver": true,
+      "snapshot": true
+    },
+    {
+      "repo": "xuper-plugin/kino-plugin-megaplay",
+      "name": "MegaPlay",
+      "kind": "anime",
+      "snapshot": true
+    },
+    {
+      "repo": "xuper-plugin/kino-plugin-mundodonghua",
+      "name": "MundoDonghua",
+      "kind": "anime",
+      "needsResolver": true,
+      "snapshot": true
+    },
+    {
+      "repo": "xuper-plugin/maraton",
+      "name": "PelisYSeries",
+      "kind": "movies"
+    },
+    {
+      "repo": "xuper-plugin/kino-plugin-peliculasflix",
+      "name": "PeliculasFlix",
+      "kind": "movies",
+      "needsResolver": true,
+      "snapshot": true
+    },
+    {
+      "repo": "xuper-plugin/kino-plugin-pelisgo",
+      "name": "Pelisgo",
+      "kind": "movies",
+      "needsResolver": true,
+      "snapshot": true
+    },
+    {
+      "repo": "xuper-plugin/kino-plugin-pelispedia",
+      "name": "Pelispedia",
+      "kind": "movies",
+      "needsResolver": true,
+      "snapshot": true
+    },
+    {
+      "repo": "xuper-plugin/kino-plugin-seriesflix",
+      "name": "Seriesflix",
+      "kind": "series",
+      "needsResolver": true,
+      "snapshot": true
+    },
+    {
+      "repo": "xuper-plugin/kino-plugin-serieskao",
+      "name": "SeriesKao",
+      "kind": "series",
+      "needsResolver": true,
+      "snapshot": true
+    },
+    {
+      "repo": "xuper-plugin/kino-plugin-seriesmetro",
+      "name": "SeriesMetro",
+      "kind": "series",
+      "needsResolver": true,
+      "snapshot": true
+    },
+    {
+      "repo": "xuper-plugin/kino-plugin-sololatino",
+      "name": "SoloLatino",
+      "kind": "movies",
+      "needsResolver": true,
+      "snapshot": true
+    },
+    {
+      "repo": "xuper-plugin/kino-plugin-latanime",
+      "name": "TodoAnime",
+      "kind": "anime",
+      "needsResolver": true,
+      "snapshot": true
+    },
+    {
+      "repo": "xuper-plugin/kino-plugin-verpelis",
+      "name": "VerPelis",
+      "kind": "movies",
+      "needsResolver": true,
+      "snapshot": true
+    }
+  ]
+}

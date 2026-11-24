@@ -5,15 +5,13 @@
 // date (kino.manage, every 4 hours by default; the person picks 4, 5 or 6 in Kino's own row of the job).
 import { makeStandardScreen } from "./std/index.js";
 import { LOGO, LOGO_ASPECT } from "./logo.js";
-import { PLUGINS } from "./catalog.js";
+import { PLUGINS, SEARCH_FIRST, useKeptCatalog, refreshCatalog } from "./catalog.js";
 import { loadStatus, pageView, pageEvery, pageActions, PAGE_EVENTS, jobIsOn, contentWanted } from "./page.js";
 
 /** The consumes entry by author (kino-plugin.json): every installed xuper-plugin plugin that opens the catalog door. */
 const MINE = "mine";
 
-/** The search's first rows (owner, 2026-11-23; Ultra Hd right after HDFull, 2026-11-24), when the person has them on; the rest
- * follow in Da-Video's catalog order. */
-export const SEARCH_FIRST = ["xuper-plugin/kino-plugin-hdfull", "xuper-plugin/kino-plugin-ultrahd", "xuper-plugin/kino-plugin-movieplus", "xuper-plugin/kino-plugin-xuper", "xuper-plugin/kino-plugin-zapptv"];
+export { SEARCH_FIRST };
 
 /** Where [repo] goes in the search: SEARCH_FIRST, then the catalog's order, then anything else. */
 export function searchRank(repo) {
@@ -44,6 +42,8 @@ const standard = () => (std ??= makeStandardScreen({
   searchHere: { sources, searchIn },
   page: {
     open: async () => {
+      // catalog.json first (owner, 2026-11-24): the list below is drawn from it.
+      await refreshCatalog();
       const mp = await loadStatus();
       // The Contenido Home is fetched behind the first drawing (the page's timer) when nothing fresh is kept.
       return { mp, jobOn: jobIsOn(), busy: mp.running, notice: null, contentLoading: contentWanted(mp) };
@@ -57,11 +57,13 @@ const standard = () => (std ??= makeStandardScreen({
 
 export async function screen(ctx) {
   await null;
+  useKeptCatalog();
   return standard().screen(ctx && typeof ctx === "object" ? ctx : {});
 }
 
 export async function screenEvent(ev) {
   await null;
+  useKeptCatalog();
   return standard().screenEvent(ev && typeof ev === "object" ? ev : {});
 }
 

@@ -3,10 +3,13 @@
 // category (src/content.js buildShared). Run by .github/workflows/content-snapshot.yml every 6 hours, after the plugins' own.
 // A plugin whose files are missing or over 48 h old is left out; nothing is written when no plugin answered.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { PLUGINS } from "../src/catalog.js";
+import { BUILT_IN_PLUGINS, parseCatalog } from "../src/catalog.js";
 import { buildShared, pickForInstalled } from "../src/content.js";
 
 const ROOT = new URL("../", import.meta.url);
+// The same list the devices use: this checkout's catalog.json (the built-in one if it is missing or not valid).
+const catalogFile = new URL("catalog.json", ROOT);
+const PLUGINS = (existsSync(catalogFile) && parseCatalog(readFileSync(catalogFile, "utf8"))?.plugins) || BUILT_IN_PLUGINS;
 const TABS_PER_PLUGIN = 3;
 const FILE_MAX_AGE_MS = 48 * 60 * 60 * 1000;
 const raw = (repo, name) => `https://raw.githubusercontent.com/${repo}/main/home/${encodeURIComponent(name)}.json`;

@@ -345,3 +345,23 @@ test("search: HDFull, Ultra Hd, Movie+, Xuper and ZappTV first (when on), then t
   const order = (await kino.plugins.providers()).map((x) => x.repo).sort((a, b) => searchRank(a) - searchRank(b));
   assert.deepEqual(order, [HDFULL, ULTRAHD, "xuper-plugin/kino-plugin-xuper", "xuper-plugin/kino-plugin-zapptv", SERIESFLIX, "xuper-plugin/kino-plugin-serieskao"]);
 });
+
+test("catalog.json drives the page and the search: fetched on open, its order and hidden entries used", async () => {
+  const cat = await import("../src/catalog.js");
+  cat.resetCatalog();
+  const kino = fakeKino();
+  const file = cat.builtInCatalogJson();
+  // Ultra Hd hidden, Seriesflix first in the search.
+  const edited = { ...file, searchFirst: [SERIESFLIX, HDFULL], plugins: file.plugins.map((x) => (x.repo === ULTRAHD ? { ...x, hidden: true } : x)) };
+  kino.fetch = async (url) => ({ ok: url === cat.CATALOG_URL, status: 200, text: async () => JSON.stringify(edited) });
+  const p = await load(kino);
+  const o = await p.screenEvent({ name: "open", state: {}, device: "phone", route: { name: "main" } });
+  o.state.dvTab = "mine";
+  const tree = await p.screen({ state: o.state, device: "phone", installed: {} });
+  const installs = nodes(tree).filter((n) => n.onPressed && n.onPressed.go && n.onPressed.go.installPlugin).map((n) => n.onPressed.go.installPlugin.repo);
+  assert.ok(!installs.includes(ULTRAHD));
+  assert.equal(installs.length, 26);
+  assert.ok(p.searchRank(SERIESFLIX) < p.searchRank(HDFULL));
+  assert.equal(cat.catalogSource, "fetched");
+  cat.resetCatalog();
+});
