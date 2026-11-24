@@ -11,8 +11,9 @@ import { loadStatus, pageView, pageEvery, pageActions, PAGE_EVENTS, jobIsOn, con
 /** The consumes entry by author (kino-plugin.json): every installed xuper-plugin plugin that opens the catalog door. */
 const MINE = "mine";
 
-/** The search's first rows (owner, 2026-11-23), when the person has them on; the rest follow in Da-Video's catalog order. */
-export const SEARCH_FIRST = ["xuper-plugin/kino-plugin-hdfull", "xuper-plugin/kino-plugin-movieplus", "xuper-plugin/kino-plugin-xuper", "xuper-plugin/kino-plugin-zapptv"];
+/** The search's first rows (owner, 2026-11-23; Ultra Hd right after HDFull, 2026-11-24), when the person has them on; the rest
+ * follow in Da-Video's catalog order. */
+export const SEARCH_FIRST = ["xuper-plugin/kino-plugin-hdfull", "xuper-plugin/kino-plugin-ultrahd", "xuper-plugin/kino-plugin-movieplus", "xuper-plugin/kino-plugin-xuper", "xuper-plugin/kino-plugin-zapptv"];
 
 /** Where [repo] goes in the search: SEARCH_FIRST, then the catalog's order, then anything else. */
 export function searchRank(repo) {

@@ -6,6 +6,7 @@ import * as kit from "../sdk/screen.mjs";
 
 const HDFULL = "xuper-plugin/kino-plugin-hdfull";
 const SERIESFLIX = "xuper-plugin/kino-plugin-seriesflix";
+const ULTRAHD = "xuper-plugin/kino-plugin-ultrahd";
 const RESOLVER = "xuper-plugin/kino-plugin-kino-resolver";
 
 function fakeKino(over = {}) {
@@ -70,14 +71,17 @@ test("the page (design C): home-screen icons, yours then the ones to install, Ed
   assert.ok(!byKey(tree, "searchButton"));
   assert.equal(byKey(tree, "close").icon, "arrow_back");
   // Yours: the heart first, then HDFull and Seriesflix; a tap on any asks for its sheet.
-  assert.deepEqual(byKey(tree, "mineGrid").children.map((c) => c.key), ["card-0", "card-4", "card-23"]);
+  assert.deepEqual(byKey(tree, "mineGrid").children.map((c) => c.key), ["card-0", "card-4", "card-24"]);
   assert.deepEqual(byKey(tree, "card-4").onTap, { event: "pick", arg: HDFULL });
   // «Nueva» on the ones with an update (the heart and Seriesflix); «Configurar» on HDFull, which needs its setup.
-  assert.ok(byKey(tree, "new-0") && byKey(tree, "new-23") && byKey(tree, "setup-4"));
-  // The rest: dimmed, with a download button each (25 of them).
+  assert.ok(byKey(tree, "new-0") && byKey(tree, "new-24") && byKey(tree, "setup-4"));
+  // The rest: dimmed, with a download button each (27 of them); Ultra Hd is the first after HDFull (owner, 2026-11-24).
   const installs = nodes(tree).filter((n) => n.onPressed && n.onPressed.go && n.onPressed.go.installPlugin);
-  assert.equal(installs.length, 26);
-  assert.equal(byKey(tree, "missingGrid").children.length, 26);
+  assert.equal(installs.length, 27);
+  assert.equal(byKey(tree, "missingGrid").children.length, 27);
+  assert.deepEqual(byKey(tree, "install-5").onPressed, { go: { installPlugin: { repo: ULTRAHD } } });
+  // To install: Xuper, Movie+, ZappTV, then Ultra Hd where HDFull (installed, card-4) would be next.
+  assert.deepEqual(byKey(tree, "missingGrid").children.slice(0, 4).map((c) => c.key), ["card-1", "card-2", "card-3", "card-5"]);
   // The sheet: Abrir, Configurar (HDFull needs its setup), Desinstalar; never Desinstalar for the heart.
   const pk = await p.screenEvent({ name: "pick", arg: HDFULL, state: o.state });
   assert.deepEqual(pk.ui, [{ open: "pluginSheet" }]);
@@ -320,7 +324,13 @@ test("after Desinstalar the sheet closes by itself and says so", async () => {
   assert.ok(!(await p.screenEvent({ name: "refresh", state: st })).ui);
 });
 
-test("search: HDFull, Movie+, Xuper and ZappTV first (when on), then the catalog's order", async () => {
+test("the catalog: Ultra Hd right after HDFull, no resolver and no snapshot (owner, 2026-11-24)", async () => {
+  const { PLUGINS } = await import("../src/catalog.js");
+  const i = PLUGINS.findIndex((x) => x.repo === HDFULL);
+  assert.deepEqual(PLUGINS[i + 1], { repo: ULTRAHD, name: "Ultra Hd", kind: "movies" });
+});
+
+test("search: HDFull, Ultra Hd, Movie+, Xuper and ZappTV first (when on), then the catalog's order", async () => {
   const kino = fakeKino();
   kino.plugins.providers = async () => [
     { repo: SERIESFLIX, name: "Seriesflix" },
@@ -328,9 +338,10 @@ test("search: HDFull, Movie+, Xuper and ZappTV first (when on), then the catalog
     { repo: "xuper-plugin/kino-plugin-serieskao", name: "SeriesKao" },
     { repo: HDFULL, name: "HDFull" },
     { repo: "xuper-plugin/kino-plugin-xuper", name: "Xuper" },
+    { repo: ULTRAHD, name: "Ultra Hd" },
   ];
   const p = await load(kino);
   const { searchRank } = p;
   const order = (await kino.plugins.providers()).map((x) => x.repo).sort((a, b) => searchRank(a) - searchRank(b));
-  assert.deepEqual(order, [HDFULL, "xuper-plugin/kino-plugin-xuper", "xuper-plugin/kino-plugin-zapptv", SERIESFLIX, "xuper-plugin/kino-plugin-serieskao"]);
+  assert.deepEqual(order, [HDFULL, ULTRAHD, "xuper-plugin/kino-plugin-xuper", "xuper-plugin/kino-plugin-zapptv", SERIESFLIX, "xuper-plugin/kino-plugin-serieskao"]);
 });

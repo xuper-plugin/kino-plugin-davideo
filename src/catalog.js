@@ -10,11 +10,15 @@ export const RESOLVER = { repo: "xuper-plugin/kino-plugin-kino-resolver", name: 
 // Da-Video's sheet offers the resolver first while it is missing (owner, 2026-11-23). snapshot: its repository keeps a ready Home
 // (home/index.json and home/<tab>.json, refreshed every 6 hours): Da-Video's Contenido tab is made of them.
 export const PLUGINS = [
-  // Preferred first (owner, 2026-11-23): Xuper, Movie+, ZappTV, HDFull; then the rest.
+  // Preferred first (owner, 2026-11-23): Xuper, Movie+, ZappTV, HDFull, and Ultra Hd right after HDFull (owner, 2026-11-24);
+  // then the rest.
   { repo: "xuper-plugin/kino-plugin-xuper", name: "Xuper", kind: "live" },
   { repo: "xuper-plugin/kino-plugin-movieplus", name: "Movie+", kind: "movies" },
   { repo: "xuper-plugin/kino-plugin-zapptv", name: "ZappTV", kind: "live" },
   { repo: "xuper-plugin/kino-plugin-hdfull", name: "HDFull", kind: "movies", needsResolver: true },
+  // Movies, series and live TV from the service's own servers (no resolver, no setup: it picks a server by itself); its
+  // catalog door (0.8.8) answers the search from its title index. Its Home is its own encrypted feed, not a ready std Home.
+  { repo: "xuper-plugin/kino-plugin-ultrahd", name: "Ultra Hd", kind: "movies" },
   { repo: "xuper-plugin/kino-plugin-animes-es", name: "AnimES", kind: "anime" },
   // Documentaries in Spanish from their own site (no resolver); its catalog door (0.2.5) answers the search.
   { repo: "xuper-plugin/kino-plugin-areadocumental", name: "Área Documental", kind: "docs" },
