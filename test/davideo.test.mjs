@@ -73,11 +73,11 @@ test("the page (design C): home-screen icons, yours then the ones to install, Ed
   assert.deepEqual(byKey(tree, "mineGrid").children.map((c) => c.key), ["card-0", "card-4", "card-19"]);
   assert.deepEqual(byKey(tree, "card-4").onTap, { event: "pick", arg: HDFULL });
   // «Nueva» on the ones with an update (the heart and Seriesflix); «Configurar» on HDFull, which needs its setup.
-  assert.ok(byKey(tree, "new-0") && byKey(tree, "new-18") && byKey(tree, "setup-4"));
-  // The rest: dimmed, with a download button each (20 of them).
+  assert.ok(byKey(tree, "new-0") && byKey(tree, "new-19") && byKey(tree, "setup-4"));
+  // The rest: dimmed, with a download button each (21 of them).
   const installs = nodes(tree).filter((n) => n.onPressed && n.onPressed.go && n.onPressed.go.installPlugin);
-  assert.equal(installs.length, 21);
-  assert.equal(byKey(tree, "missingGrid").children.length, 21);
+  assert.equal(installs.length, 22);
+  assert.equal(byKey(tree, "missingGrid").children.length, 22);
   // The sheet: Abrir, Configurar (HDFull needs its setup), Desinstalar; never Desinstalar for the heart.
   const pk = await p.screenEvent({ name: "pick", arg: HDFULL, state: o.state });
   assert.deepEqual(pk.ui, [{ open: "pluginSheet" }]);
