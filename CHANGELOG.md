@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.9
+
+- HentaiMama (+18) can be installed and kept updated from Da-Video (std 1.9.3)
+
 ## 0.4.8
 
 - Search: HDFull, Movie+, Xuper and ZappTV come first when you have them on, then the rest in the catalog's order.

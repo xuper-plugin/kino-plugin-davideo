@@ -807,7 +807,11 @@
     "maxUse": 12,
     "installTimeoutMs": 45000,
     "parallel": 4,
-    "resolveTimeoutMs": 75000
+    "resolveTimeoutMs": 75000,
+    "$comment": "A scraper the person deleted in Plugins > De terceros (one by one, or its whole repository by Borrar todo) and has not installed again by hand: available() adds removedField: true to its entry and use() lists it in failed with removedCode; Kino never reinstalls it for a plugin. Additive: an older Kino never sends either.",
+    "removedField": "removed",
+    "removedCode": "removed",
+    "useFailCodes": ["removed", "not_found", "refused", "timeout", "failed"]
   },
   "kinoTmdb": {
     "fromApp": "0.9.53",

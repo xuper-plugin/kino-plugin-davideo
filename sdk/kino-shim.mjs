@@ -858,7 +858,9 @@ function deviceFor(device, env) {
  * Nuvio repositories the manifest names: `{ "owner/repo": { available: [{ id, name, description?, types?, languages?, compatible? }],
  * streams: { "<scraper id>": { "movie:603": { url, mime?, headers?, label?, subtitles?, alternatives? }, "series:1399:1:1": {...},
  * "series:1399": {...}, "movie:1": { error: { code, message } }, "movie:2": { url, delayMs: 90000 } } } } }`. Without it, kino.nuvio throws
- * `unavailable`: the kit has no scrapers of its own.
+ * `unavailable`: the kit has no scrapers of its own. A scraper the person deleted in Kino (Plugins > De terceros): `removed: true` on its
+ * `available` entry, or `removed: true` on the repository for all of them (Borrar todo); while it is not installed, `available` answers
+ * it with `removed: true` and `use` fails it with code `removed`, as the app does.
  * kino.meta / kino.tmdb (Kino 0.9.53): [metaFixture] (an object, or a file path; default env KINO_META_FIXTURE) answers
  * kino.meta offline -- keys `"<type>:<idKey>:<value>"` or `"<idKey>:<value>"` (`"movie:imdb:tt0133093"`, `"tmdb:603"`), and
  * for a lookup by title (Kino 0.9.55) `"<type>:title:<normalised title>:<year>"` or without the year (`"movie:title:the matrix:1999"`) --
@@ -1671,19 +1673,21 @@ export function createKino(manifest, { appVersion = "sdk", filesDir = null, lang
     const repo = nuvioRepoAnswers[key];
     const offered = (Array.isArray(repo.available) ? repo.available : []).filter((o) => plainObject(o) && typeof o.id === "string" && o.id).slice(0, N.maxOffered);
     if (!nuvioInstalled.has(repoKey(query.repo))) nuvioInstalled.set(repoKey(query.repo), new Map());
-    return { repo, offered, installed: nuvioInstalled.get(repoKey(query.repo)) };
+    const isRemoved = (id) => repo.removed === true || offered.some((o) => o.id === id && o.removed === true);
+    return { repo, offered, installed: nuvioInstalled.get(repoKey(query.repo)), isRemoved };
   }
   const nuvioApi = Object.freeze({
     async available(query) {
-      const { offered, installed } = await nuvioRepo(query);
+      const { offered, installed, isRemoved } = await nuvioRepo(query);
       return offered.map((o) => ({
         id: o.id, name: String(o.name || o.id), description: String(o.description || "").slice(0, 120),
         types: Array.isArray(o.types) ? o.types.map(String) : [], languages: Array.isArray(o.languages) ? o.languages.map(String) : [],
         compatible: o.compatible !== false, installed: installed.has(o.id),
+        ...(!installed.has(o.id) && isRemoved(o.id) ? { removed: true } : {}),
       }));
     },
     async use(query) {
-      const { offered, installed } = await nuvioRepo(query);
+      const { offered, installed, isRemoved } = await nuvioRepo(query);
       if (!Array.isArray(query.scrapers) || !query.scrapers.length || query.scrapers.length > N.maxUse || !query.scrapers.every((s) => typeof s === "string" && s)) {
         throw kinoError("invalid_request", `kino.nuvio.use needs "scrapers": 1 to ${N.maxUse} scraper ids`);
       }
@@ -1691,7 +1695,9 @@ export function createKino(manifest, { appVersion = "sdk", filesDir = null, lang
       const failed = [];
       for (const id of query.scrapers) {
         const o = offered.find((x) => x.id === id);
-        if (!o) failed.push({ id, code: "not_found", message: "the repository offers no such scraper" });
+        if (installed.has(id)) ready.push(id);
+        else if (isRemoved(id)) failed.push({ id, code: N.removedCode, message: "the person removed this scraper" });
+        else if (!o) failed.push({ id, code: "not_found", message: "the repository offers no such scraper" });
         else if (o.compatible === false) failed.push({ id, code: "refused", message: "Kino does not use this scraper (it needs torrents)" });
         else { if (!installed.has(id)) installed.set(id, { id, name: String(o.name || id) }); ready.push(id); }
       }

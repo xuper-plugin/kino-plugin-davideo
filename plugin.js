@@ -812,6 +812,8 @@ var PLUGINS = [
   { repo: "xuper-plugin/kino-plugin-cuevanapro", name: "Cuevana Pro", kind: "movies", needsResolver: true, snapshot: true },
   { repo: "xuper-plugin/kino-plugin-doramasyt", name: "DoramasYT", kind: "series", needsResolver: true, snapshot: true },
   { repo: "xuper-plugin/kino-plugin-embed69", name: "Embed 69", kind: "movies", needsResolver: true, snapshot: true },
+  // +18: no ready Home (never in Contenido) and no catalog door (never in Da-Video's search); only installed and updated.
+  { repo: "xuper-plugin/kino-plugin-hentaimama", name: "HentaiMama (+18)", kind: "adult" },
   { repo: "xuper-plugin/kino-plugin-lacartoons", name: "LA Cartoons Plus", kind: "kids", needsResolver: true, snapshot: true },
   { repo: "xuper-plugin/kino-plugin-latino", name: "Latino", kind: "movies", needsResolver: true, snapshot: true },
   { repo: "xuper-plugin/kino-plugin-mundodonghua", name: "MundoDonghua", kind: "anime", needsResolver: true, snapshot: true },
