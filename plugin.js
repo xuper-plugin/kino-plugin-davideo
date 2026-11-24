@@ -810,6 +810,9 @@ var PLUGINS = [
   // Documentaries in Spanish from their own site (no resolver); its catalog door (0.2.5) answers the search.
   { repo: "xuper-plugin/kino-plugin-areadocumental", name: "Área Documental", kind: "docs" },
   { repo: "xuper-plugin/kino-plugin-cinehdplus", name: "CineHD Plus", kind: "movies", needsResolver: true, snapshot: true },
+  // Movies and series from TMDB, the video from Cinejoy's own public player in the hidden browser (no resolver); its catalog
+  // door (1.1.1) answers the search.
+  { repo: "xuper-plugin/kino-plugin-cinejoy", name: "Cinejoy", kind: "movies" },
   { repo: "xuper-plugin/kino-plugin-cinemitas", name: "Cinemitas", kind: "movies", needsResolver: true, snapshot: true },
   { repo: "xuper-plugin/kino-plugin-cuevanapro", name: "Cuevana Pro", kind: "movies", needsResolver: true, snapshot: true },
   { repo: "xuper-plugin/kino-plugin-doramasyt", name: "DoramasYT", kind: "series", needsResolver: true, snapshot: true },
