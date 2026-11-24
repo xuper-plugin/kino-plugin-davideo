@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.14
+
+- Ultra Hd can be installed from Da-Video, right after HDFull, and its search finds Ultra Hd's titles (from its title index, Ultra Hd 0.8.8)
+- The catalog comes from catalog.json on this repository's main branch (order, the search's first rows, hidden plugins, flags, new xuper-plugin plugins), kept on the device; the built-in list when it cannot be fetched
+
 ## 0.4.13
 
 - Cinejoy can be installed from Da-Video, and its search finds Cinejoy's titles (std 1.9.3)

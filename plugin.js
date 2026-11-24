@@ -800,12 +800,16 @@ var LOGO_ASPECT = "1:1";
 // src/catalog.js
 var OWNER = "xuper-plugin";
 var RESOLVER = { repo: "xuper-plugin/kino-plugin-kino-resolver", name: "Kino Resolver" };
-var PLUGINS = [
-  // Preferred first (owner, 2026-11-23): Xuper, Movie+, ZappTV, HDFull; then the rest.
+var BUILT_IN_PLUGINS = [
+  // Preferred first (owner, 2026-11-23): Xuper, Movie+, ZappTV, HDFull, and Ultra Hd right after HDFull (owner, 2026-11-24);
+  // then the rest.
   { repo: "xuper-plugin/kino-plugin-xuper", name: "Xuper", kind: "live" },
   { repo: "xuper-plugin/kino-plugin-movieplus", name: "Movie+", kind: "movies" },
   { repo: "xuper-plugin/kino-plugin-zapptv", name: "ZappTV", kind: "live" },
   { repo: "xuper-plugin/kino-plugin-hdfull", name: "HDFull", kind: "movies", needsResolver: true },
+  // Movies, series and live TV from the service's own servers (no resolver, no setup: it picks a server by itself); its
+  // catalog door (0.8.8) answers the search from its title index. Its Home is its own encrypted feed, not a ready std Home.
+  { repo: "xuper-plugin/kino-plugin-ultrahd", name: "Ultra Hd", kind: "movies" },
   { repo: "xuper-plugin/kino-plugin-animes-es", name: "AnimES", kind: "anime" },
   // Documentaries in Spanish from their own site (no resolver); its catalog door (0.2.5) answers the search.
   { repo: "xuper-plugin/kino-plugin-areadocumental", name: "Área Documental", kind: "docs" },
@@ -838,6 +842,115 @@ var PLUGINS = [
   { repo: "xuper-plugin/kino-plugin-latanime", name: "TodoAnime", kind: "anime", needsResolver: true, snapshot: true },
   { repo: "xuper-plugin/kino-plugin-verpelis", name: "VerPelis", kind: "movies", needsResolver: true, snapshot: true }
 ];
+var BUILT_IN_SEARCH_FIRST = [
+  "xuper-plugin/kino-plugin-hdfull",
+  "xuper-plugin/kino-plugin-ultrahd",
+  "xuper-plugin/kino-plugin-movieplus",
+  "xuper-plugin/kino-plugin-xuper",
+  "xuper-plugin/kino-plugin-zapptv"
+];
+var CATALOG_URL = "https://raw.githubusercontent.com/xuper-plugin/kino-plugin-davideo/main/catalog.json";
+var CATALOG_CACHE_KEY = "dv:catalog:v1";
+var CATALOG_MAX_BYTES = 64 * 1024;
+var CATALOG_MAX_PLUGINS = 100;
+var SEARCH_FIRST_MAX = 10;
+var KINDS = ["movies", "series", "anime", "live", "docs", "kids", "adult"];
+var NAME_MAX = 40;
+var REPO = /^xuper-plugin\/[a-z0-9][a-z0-9._-]{0,99}$/;
+var CONTROL = /[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff]/;
+var FLAGS = ["needsResolver", "snapshot", "hidden"];
+var REFETCH_MS = 10 * 60 * 1e3;
+var FETCH_MS = 5e3;
+var repoOf = (v) => typeof v === "string" && REPO.test(v.trim().toLowerCase()) ? v.trim().toLowerCase() : null;
+function parseCatalog(input) {
+  let o = input;
+  if (typeof input === "string") {
+    if (input.length > CATALOG_MAX_BYTES) return null;
+    try {
+      o = JSON.parse(input);
+    } catch (_) {
+      return null;
+    }
+  } else {
+    try {
+      if (JSON.stringify(o).length > CATALOG_MAX_BYTES) return null;
+    } catch (_) {
+      return null;
+    }
+  }
+  if (!o || typeof o !== "object" || Array.isArray(o) || o.v !== 1 || !Array.isArray(o.plugins)) return null;
+  if (o.plugins.length > CATALOG_MAX_PLUGINS) return null;
+  const seen = /* @__PURE__ */ new Set();
+  const plugins = [];
+  for (const e of o.plugins) {
+    if (!e || typeof e !== "object" || Array.isArray(e)) return null;
+    const repo = repoOf(e.repo);
+    if (!repo || repo === RESOLVER.repo || seen.has(repo)) return null;
+    seen.add(repo);
+    const name = typeof e.name === "string" ? e.name.trim() : "";
+    if (!name || name.length > NAME_MAX || CONTROL.test(name)) return null;
+    if (!KINDS.includes(e.kind)) return null;
+    for (const f of FLAGS) if (e[f] !== void 0 && typeof e[f] !== "boolean") return null;
+    if (e.hidden === true) continue;
+    const entry = { repo, name, kind: e.kind };
+    if (e.needsResolver === true) entry.needsResolver = true;
+    if (e.snapshot === true) entry.snapshot = true;
+    plugins.push(entry);
+  }
+  if (!plugins.length) return null;
+  let searchFirst = BUILT_IN_SEARCH_FIRST;
+  if (o.searchFirst !== void 0) {
+    if (!Array.isArray(o.searchFirst) || o.searchFirst.length > SEARCH_FIRST_MAX) return null;
+    searchFirst = [];
+    for (const r of o.searchFirst) {
+      const repo = repoOf(r);
+      if (!repo) return null;
+      if (!searchFirst.includes(repo)) searchFirst.push(repo);
+    }
+  }
+  const listed = new Set(plugins.map((p) => p.repo));
+  return { plugins, searchFirst: searchFirst.filter((r) => listed.has(r)) };
+}
+var PLUGINS = BUILT_IN_PLUGINS;
+var SEARCH_FIRST = BUILT_IN_SEARCH_FIRST;
+var catalogSource = "built-in";
+var keptLoaded = false;
+var fetchedAt = 0;
+function apply(cat, source) {
+  PLUGINS = cat.plugins;
+  SEARCH_FIRST = cat.searchFirst;
+  catalogSource = source;
+}
+function useKeptCatalog(kino = globalThis.kino) {
+  if (keptLoaded) return catalogSource;
+  keptLoaded = true;
+  try {
+    const kept = kino && kino.storage ? kino.storage.get(CATALOG_CACHE_KEY) : null;
+    const cat = kept ? parseCatalog(kept) : null;
+    if (cat) apply(cat, "kept");
+  } catch (_) {
+  }
+  return catalogSource;
+}
+async function refreshCatalog(kino = globalThis.kino, now = Date.now()) {
+  useKeptCatalog(kino);
+  if (!kino || typeof kino.fetch !== "function" || fetchedAt && now - fetchedAt < REFETCH_MS) return catalogSource;
+  fetchedAt = now;
+  try {
+    const r = await kino.fetch(CATALOG_URL, { timeoutMs: FETCH_MS });
+    if (!r || !r.ok) return catalogSource;
+    const text2 = await r.text();
+    const cat = parseCatalog(text2);
+    if (!cat) return catalogSource;
+    apply(cat, "fetched");
+    try {
+      kino.storage.set(CATALOG_CACHE_KEY, text2);
+    } catch (_) {
+    }
+  } catch (_) {
+  }
+  return catalogSource;
+}
 var iconOf = (entry) => `https://raw.githubusercontent.com/${entry.repo}/HEAD/icon.png`;
 function entryOf(repo) {
   const key = String(repo || "").toLowerCase();
@@ -854,7 +967,7 @@ var RETRY_MS = 2 * 60 * 1e3;
 var PER_CATEGORY = 30;
 var MIN_PER_CATEGORY = 4;
 var MAX_SLIDES2 = 8;
-var FETCH_MS = 7e3;
+var FETCH_MS2 = 7e3;
 function pickForInstalled(shared, installed) {
   const order = new Map(installed.map((r, i) => [r, i]));
   const rails = [];
@@ -908,7 +1021,7 @@ var SHARED_MAX_AGE_MS = 48 * 60 * 60 * 1e3;
 async function loadContent(plugins, now = Date.now()) {
   let shared = null;
   try {
-    const r = await k().fetch(SHARED_URL, { timeoutMs: FETCH_MS });
+    const r = await k().fetch(SHARED_URL, { timeoutMs: FETCH_MS2 });
     if (r && r.ok) shared = JSON.parse(await r.text());
   } catch (_) {
   }
@@ -1243,7 +1356,6 @@ var pageEvery = ({ state }) => state && state.contentLoading ? { ms: 1e3, event:
 
 // src/plugin.js
 var MINE = "mine";
-var SEARCH_FIRST = ["xuper-plugin/kino-plugin-hdfull", "xuper-plugin/kino-plugin-movieplus", "xuper-plugin/kino-plugin-xuper", "xuper-plugin/kino-plugin-zapptv"];
 function searchRank(repo) {
   const key = String(repo || "").toLowerCase();
   const first = SEARCH_FIRST.indexOf(key);
@@ -1276,6 +1388,7 @@ var standard = () => std ?? (std = makeStandardScreen({
   searchHere: { sources, searchIn },
   page: {
     open: async () => {
+      await refreshCatalog();
       const mp = await loadStatus();
       return { mp, jobOn: jobIsOn(), busy: mp.running, notice: null, contentLoading: contentWanted(mp) };
     },
@@ -1287,10 +1400,12 @@ var standard = () => std ?? (std = makeStandardScreen({
 }));
 async function screen(ctx) {
   await null;
+  useKeptCatalog();
   return standard().screen(ctx && typeof ctx === "object" ? ctx : {});
 }
 async function screenEvent(ev) {
   await null;
+  useKeptCatalog();
   return standard().screenEvent(ev && typeof ev === "object" ? ev : {});
 }
 async function job(ctx) {
