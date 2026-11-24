@@ -807,6 +807,8 @@ var PLUGINS = [
   { repo: "xuper-plugin/kino-plugin-zapptv", name: "ZappTV", kind: "live" },
   { repo: "xuper-plugin/kino-plugin-hdfull", name: "HDFull", kind: "movies", needsResolver: true },
   { repo: "xuper-plugin/kino-plugin-animes-es", name: "AnimES", kind: "anime" },
+  // Documentaries in Spanish from their own site (no resolver); its catalog door (0.2.5) answers the search.
+  { repo: "xuper-plugin/kino-plugin-areadocumental", name: "Área Documental", kind: "docs" },
   { repo: "xuper-plugin/kino-plugin-cinehdplus", name: "CineHD Plus", kind: "movies", needsResolver: true, snapshot: true },
   { repo: "xuper-plugin/kino-plugin-cinemitas", name: "Cinemitas", kind: "movies", needsResolver: true, snapshot: true },
   { repo: "xuper-plugin/kino-plugin-cuevanapro", name: "Cuevana Pro", kind: "movies", needsResolver: true, snapshot: true },
@@ -814,6 +816,8 @@ var PLUGINS = [
   { repo: "xuper-plugin/kino-plugin-embed69", name: "Embed 69", kind: "movies", needsResolver: true, snapshot: true },
   // +18: no ready Home, so never in Contenido; its catalog door (1.2.1) answers Da-Video's search.
   { repo: "xuper-plugin/kino-plugin-hentaimama", name: "HentaiMama (+18)", kind: "adult" },
+  // Asian dramas, series, movies and anime with their own player (no resolver); its catalog door (0.1.1) answers the search.
+  { repo: "xuper-plugin/kino-plugin-kisskh", name: "KissKH", kind: "series" },
   { repo: "xuper-plugin/kino-plugin-lacartoons", name: "LA Cartoons Plus", kind: "kids", needsResolver: true, snapshot: true },
   { repo: "xuper-plugin/kino-plugin-latino", name: "Latino", kind: "movies", needsResolver: true, snapshot: true },
   // Japanese anime from its own server (no resolver), catalog from TMDB; its catalog door (1.1.2) answers the search and its

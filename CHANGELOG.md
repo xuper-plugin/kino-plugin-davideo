@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.12
+
+- KissKH and Área Documental can be installed from Da-Video, and its search finds their titles (std 1.9.3)
+
 ## 0.4.11
 
 - MegaPlay's titles appear in Contenido (std 1.9.3)
