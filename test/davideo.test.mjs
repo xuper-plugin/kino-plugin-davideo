@@ -70,14 +70,14 @@ test("the page (design C): home-screen icons, yours then the ones to install, Ed
   assert.ok(!byKey(tree, "searchButton"));
   assert.equal(byKey(tree, "close").icon, "arrow_back");
   // Yours: the heart first, then HDFull and Seriesflix; a tap on any asks for its sheet.
-  assert.deepEqual(byKey(tree, "mineGrid").children.map((c) => c.key), ["card-0", "card-4", "card-20"]);
+  assert.deepEqual(byKey(tree, "mineGrid").children.map((c) => c.key), ["card-0", "card-4", "card-22"]);
   assert.deepEqual(byKey(tree, "card-4").onTap, { event: "pick", arg: HDFULL });
   // «Nueva» on the ones with an update (the heart and Seriesflix); «Configurar» on HDFull, which needs its setup.
-  assert.ok(byKey(tree, "new-0") && byKey(tree, "new-20") && byKey(tree, "setup-4"));
-  // The rest: dimmed, with a download button each (22 of them).
+  assert.ok(byKey(tree, "new-0") && byKey(tree, "new-22") && byKey(tree, "setup-4"));
+  // The rest: dimmed, with a download button each (24 of them).
   const installs = nodes(tree).filter((n) => n.onPressed && n.onPressed.go && n.onPressed.go.installPlugin);
-  assert.equal(installs.length, 23);
-  assert.equal(byKey(tree, "missingGrid").children.length, 23);
+  assert.equal(installs.length, 25);
+  assert.equal(byKey(tree, "missingGrid").children.length, 25);
   // The sheet: Abrir, Configurar (HDFull needs its setup), Desinstalar; never Desinstalar for the heart.
   const pk = await p.screenEvent({ name: "pick", arg: HDFULL, state: o.state });
   assert.deepEqual(pk.ui, [{ open: "pluginSheet" }]);
