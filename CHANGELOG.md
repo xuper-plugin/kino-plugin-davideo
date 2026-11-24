@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.15
+
+- Listed in the Kino Plugins store (no longer hidden from it)
+
 ## 0.4.14
 
 - Ultra Hd can be installed from Da-Video, right after HDFull, and its search finds Ultra Hd's titles (from its title index, Ultra Hd 0.8.8)
