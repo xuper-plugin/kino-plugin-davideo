@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.10
+
+- MegaPlay can be installed from Da-Video, and MegaPlay and HentaiMama answer its search (std 1.9.3)
+
 ## 0.4.9
 
 - HentaiMama (+18) can be installed and kept updated from Da-Video (std 1.9.3)
