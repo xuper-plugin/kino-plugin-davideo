@@ -70,7 +70,7 @@ test("the page (design C): home-screen icons, yours then the ones to install, Ed
   assert.ok(!byKey(tree, "searchButton"));
   assert.equal(byKey(tree, "close").icon, "arrow_back");
   // Yours: the heart first, then HDFull and Seriesflix; a tap on any asks for its sheet.
-  assert.deepEqual(byKey(tree, "mineGrid").children.map((c) => c.key), ["card-0", "card-4", "card-18"]);
+  assert.deepEqual(byKey(tree, "mineGrid").children.map((c) => c.key), ["card-0", "card-4", "card-19"]);
   assert.deepEqual(byKey(tree, "card-4").onTap, { event: "pick", arg: HDFULL });
   // «Nueva» on the ones with an update (the heart and Seriesflix); «Configurar» on HDFull, which needs its setup.
   assert.ok(byKey(tree, "new-0") && byKey(tree, "new-18") && byKey(tree, "setup-4"));
