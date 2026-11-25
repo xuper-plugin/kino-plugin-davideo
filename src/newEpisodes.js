@@ -13,6 +13,8 @@ export const STORAGE_KEY = "newEpisodes";
 const MAX_NOTIFIED = 500;
 const DAY_MS = 86400000;
 const ALIAS = "mine";
+/** At most this many plugins' `episodes` asked for one series in one run. */
+export const EPISODES_PER_SERIES = 3;
 
 /** Lower case, no accents, letters and digits only: how titles are compared. */
 const fold = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "");
@@ -122,6 +124,52 @@ export function pickItem(items, { tmdb, title }) {
   return (want && list.find((it) => itemTmdb(it) === 0 && fold(it.title) === want)) || null;
 }
 
+/** TMDB's episode as {season, episode}, or null when there is none, it is a special (season 0) or it has not aired by [today]. */
+function airedOf(e, today) {
+  if (!e || !posInt(e.season_number) || !posInt(e.episode_number)) return null;
+  if (typeof e.air_date === "string" && e.air_date && e.air_date > today) return null;
+  return { season: e.season_number, episode: e.episode_number };
+}
+
+/** TMDB's regular seasons (no specials), in order: [{ season, count }]. */
+const seasonCounts = (seasons) => (Array.isArray(seasons) ? seasons : [])
+  .filter((s) => s && posInt(s.season_number) && nonNegInt(s.episode_count))
+  .map((s) => ({ season: s.season_number, count: s.episode_count }))
+  .sort((a, b) => a.season - b.season);
+
+/** Episode [n] counted straight through, as TMDB's {season, episode}, or null when the seasons do not reach it. */
+export function fromAbsolute(seasons, n) {
+  let left = n;
+  for (const s of seasonCounts(seasons)) {
+    if (left <= s.count) return { season: s.season, episode: left };
+    left -= s.count;
+  }
+  return null;
+}
+
+/**
+ * The episode the library says was played, in TMDB's numbering: a source that numbers straight through (season 1, a number
+ * beyond TMDB's season 1) is converted; one that cannot be (or a special) is unknown (null).
+ */
+export function playedOf(c, seasons) {
+  if (!c || !posInt(c.season) || !posInt(c.episode)) return null;
+  if (c.season !== 1) return { season: c.season, episode: c.episode };
+  const first = seasonCounts(seasons).find((s) => s.season === 1);
+  if (!first || c.episode <= first.count) return { season: 1, episode: c.episode };
+  return fromAbsolute(seasons, c.episode);
+}
+
+/** The episode right after [floor] (which is before [last], the last aired), by TMDB's season episode counts; null if unknown. */
+export function nextAfter(seasons, floor, last) {
+  if (floor.season === last.season) return { season: floor.season, episode: floor.episode + 1 };
+  const counts = seasonCounts(seasons);
+  const cur = counts.find((s) => s.season === floor.season);
+  if (cur && floor.episode < cur.count) return { season: floor.season, episode: floor.episode + 1 };
+  const next = counts.find((s) => s.season > floor.season);
+  if (next) return { season: next.season, episode: 1 };
+  return floor.season < last.season ? { season: last.season, episode: 1 } : null;
+}
+
 /** The real kino, bound lazily (globalThis.kino is only there at run time). `call` asks one plugin of the author entry. */
 export function bindDeps(kino) {
   const has = (o, f) => o && typeof o[f] === "function";
@@ -183,18 +231,30 @@ async function run(deps) {
   let visited = 0;
   let unfinished = -1; // the first candidate left half done (out of requests, a notice refused once): the cursor stops there
 
+  const seriesOf = (id) => { const m = /^ep-(\d+)-s(\d+)e(\d+)$/.exec(id); return m ? { key: m[1], season: +m[2], episode: +m[3] } : null; };
+  // Only ever raises a series' baseline (TMDB can briefly report an older episode).
+  const raise = (key, ep) => {
+    if (ep && (!state.baselines[key] || isNewer(ep, state.baselines[key]))) state.baselines[key] = { season: ep.season, episode: ep.episode };
+  };
+  // Drops a series' pending ids other than [keep] (a superseded episode: the person watched on, or TMDB moved).
+  const dropPending = (key, keep) => { for (const k of Object.keys(state.pending)) if (k !== keep && k.startsWith(`ep-${key}-`)) delete state.pending[k]; };
   const save = () => {
-    // Prune to the series still in the library, and the last MAX_NOTIFIED ids.
+    // Prune to the series still in the library, pending ids within RETRY_DAYS, and the last MAX_NOTIFIED ids. A pending id
+    // that outlived its window is dropped as the check would: its baseline moves up to it, so its timer never restarts.
     const still = new Set((Array.isArray(watched) ? watched : []).filter((e) => e && e.ids && posInt(e.ids.tmdb)).map((e) => String(e.ids.tmdb)));
+    const pending = {};
+    for (const [k, v] of Object.entries(state.pending)) {
+      const p = seriesOf(k);
+      if (!p || !still.has(p.key)) continue;
+      if (now - v > L.RETRY_DAYS * DAY_MS) { raise(p.key, p); continue; }
+      pending[k] = v;
+    }
     const baselines = {};
     for (const [k, v] of Object.entries(state.baselines)) if (still.has(k)) baselines[k] = v;
-    const pending = {};
-    for (const [k, v] of Object.entries(state.pending)) { const m = /^ep-(\d+)-/.exec(k); if (m && still.has(m[1])) pending[k] = v; }
     const out = { cursor: list.length ? (state.cursor % list.length + (unfinished >= 0 ? unfinished : visited)) % list.length : 0, baselines, pending, notified: state.notified.slice(-MAX_NOTIFIED) };
     try { deps.storage.set(STORAGE_KEY, JSON.stringify(out)); } catch (_) { /* full storage: the next run repeats this one */ }
   };
   const later = (i) => { if (unfinished < 0) unfinished = i; };
-  const settle = (key, aired) => { state.baselines[key] = { season: aired.season, episode: aired.episode }; };
 
   // candidates() already rotated the list: index i counts from the cursor.
   for (let i = 0; i < list.length; i++) {
@@ -206,53 +266,65 @@ async function run(deps) {
     let body;
     try { body = await deps.tmdb(`/tv/${c.tmdb}`, {}); } catch (_) { body = null; }
     summary.checked++;
-    const last = body && body.last_episode_to_air;
-    const aired = last && nonNegInt(last.season_number) && posInt(last.episode_number)
-      ? { season: last.season_number, episode: last.episode_number, airDate: typeof last.air_date === "string" ? last.air_date : "" }
-      : null;
-    if (!aired || (aired.airDate && aired.airDate > today)) { continue; }
-    const baseline = state.baselines[key];
-    if (!baseline) { settle(key, aired); continue; } // first sight: what is already out never notifies
-    const played = Number.isInteger(c.season) && Number.isInteger(c.episode) ? { season: c.season, episode: c.episode } : null;
-    if (!isNewer(aired, baseline) || (played && !isNewer(aired, played))) { settle(key, aired); continue; }
-    const id = `ep-${c.tmdb}-s${aired.season}e${aired.episode}`;
-    if (notified.has(id)) { settle(key, aired); delete state.pending[id]; continue; }
+    const last = airedOf(body && body.last_episode_to_air, today); // a season 0 special counts as nothing aired
+    if (!last) continue;
+    if (!state.baselines[key]) { raise(key, last); continue; } // first sight: what is already out never notifies
+    const seasons = body.seasons;
+    const played = playedOf(c, seasons);
+    const floor = played && isNewer(played, state.baselines[key]) ? played : state.baselines[key];
+    if (!isNewer(last, floor)) { raise(key, last); dropPending(key, null); continue; } // caught up
+    // The first episode after what the person has (or Da-Video's baseline), not the last one aired: a season released all at
+    // once notifies its first chapter.
+    const target = nextAfter(seasons, floor, last);
+    if (!target) continue;
+    if (target.season !== last.season) {
+      if (requests + 3 > L.REQUESTS) { later(i); break; } // season data + search + episodes do not fit: first next run
+      requests++;
+      let season;
+      try { season = await deps.tmdb(`/tv/${c.tmdb}/season/${target.season}`, {}); } catch (_) { season = null; }
+      const ep = season && Array.isArray(season.episodes) ? season.episodes.find((e) => e && e.episode_number === target.episode) : null;
+      if (!ep || typeof ep.air_date !== "string" || !ep.air_date || ep.air_date > today) continue; // not out (or unknown): wait
+    }
+    const id = `ep-${c.tmdb}-s${target.season}e${target.episode}`;
+    dropPending(key, id);
+    if (notified.has(id)) { raise(key, last); delete state.pending[id]; continue; }
     if (!(id in state.pending)) state.pending[id] = now;
-    if (now - state.pending[id] > L.RETRY_DAYS * DAY_MS) { settle(key, aired); delete state.pending[id]; continue; } // nobody had it: dropped
+    if (now - state.pending[id] > L.RETRY_DAYS * DAY_MS) { raise(key, last); delete state.pending[id]; continue; } // nobody had it: dropped
     if (requests + 2 > L.REQUESTS) { later(i); break; } // no room for search + episodes: this series goes first next run
 
     requests++;
     let answers;
     try { answers = await deps.callAll(ALIAS, "search", { q: c.title, type: "series", tmdb: c.tmdb }); } catch (_) { answers = []; }
-    const absolute = absoluteNumber(body.seasons, aired.season, aired.episode);
+    const absolute = absoluteNumber(seasons, target.season, target.episode);
     let hit = null;
-    let outOfRequests = false;
+    let asked = 0;
     for (const a of Array.isArray(answers) ? answers : []) {
+      // A series gets at most EPISODES_PER_SERIES door calls a run, then the others have their turn.
+      if (asked >= EPISODES_PER_SERIES || requests >= L.REQUESTS) break;
       if (!a || !a.ok || typeof a.repo !== "string") continue;
       const item = pickItem(a.value, c);
       if (!item) continue;
-      if (requests >= L.REQUESTS) { outOfRequests = true; break; }
       requests++;
+      asked++;
       let chapters;
       try { chapters = await deps.call(a.repo, "episodes", { ref: item.ref }); } catch (_) { continue; }
-      const chapter = matchChapter(chapters, { season: aired.season, episode: aired.episode, absolute });
+      const chapter = matchChapter(chapters, { season: target.season, episode: target.episode, absolute });
       if (chapter) { hit = { repo: a.repo, name: a.name || a.id || a.repo, ref: item.ref, chapter }; break; }
     }
-    if (!hit) { if (outOfRequests) later(i); continue; } // pending: a later run asks again
-    const notice = noticeOf({ tmdb: c.tmdb, title: c.title, season: aired.season, episode: aired.episode, repo: hit.repo, ref: hit.ref, pluginName: hit.name, chapter: hit.chapter });
+    if (!hit) continue; // pending: asked again when its turn comes round
+    const notice = noticeOf({ tmdb: c.tmdb, title: c.title, season: target.season, episode: target.episode, repo: hit.repo, ref: hit.ref, pluginName: hit.name, chapter: hit.chapter });
     try {
       await deps.notify(notice);
     } catch (e) {
       const code = errCode(e);
       if (code === "permission_denied" || code === "not_allowed") { save(); return { ...summary, skipped: "notifications_denied" }; }
-      later(i);
-      continue; // rate limited or refused this once: still pending, the cursor stays here
+      continue; // rate limited or refused this once: still pending, asked again on its next turn
     }
     summary.posted++;
     notified.add(id);
     state.notified.push(id);
     delete state.pending[id];
-    settle(key, aired);
+    raise(key, last); // one notice covers everything aired so far
   }
   save();
   return summary;

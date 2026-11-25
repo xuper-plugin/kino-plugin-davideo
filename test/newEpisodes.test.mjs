@@ -47,7 +47,7 @@ function fakeKino(over = {}) {
     async tmdb(path) {
       calls.push(["tmdb", path]);
       const id = /\/tv\/(\d+)/.exec(path)[1];
-      const b = (over.tmdb || {})[id];
+      const b = (over.tmdb || {})[path] ?? (path === `/tv/${id}` ? (over.tmdb || {})[id] : undefined);
       if (!b) { const e = new Error("404"); e.code = "not_found"; throw e; }
       return b;
     },
@@ -358,4 +358,127 @@ test("never throws, whatever kino does", async () => {
   assert.equal(typeof out, "object");
   const broken = await runNewEpisodes({}, { apiVersion: 35, library: async () => { throw new Error("x"); }, notify: () => {}, tmdb: () => {}, callAll: () => {}, call: () => {}, storage: {} });
   assert.deepEqual(broken, { skipped: "library_failed" });
+});
+
+// Fix round 1 (review findings).
+
+const bearSearch = { [HDFULL]: [{ id: "1", ref: "hd:bear", title: "The Bear", kind: "series", tmdb: 136315 }] };
+
+test("the baseline never goes backwards when TMDB briefly reports an older episode", async () => {
+  const kino = fakeKino({ tmdb: { 136315: tv(3, 4) }, state: seen({ 136315: { season: 3, episode: 6 } }), search: bearSearch });
+  const out = await runNewEpisodes({}, deps(kino));
+  assert.equal(out.posted, 0);
+  assert.deepEqual(stateOf(kino).baselines["136315"], { season: 3, episode: 6 });
+});
+
+test("a season 0 special never posts nor moves the baseline", async () => {
+  const kino = fakeKino({
+    tmdb: { 136315: tv(0, 2) },
+    state: seen({ 136315: { season: 3, episode: 4 } }),
+    search: bearSearch,
+    episodes: { [HDFULL]: { "hd:bear": [{ season: 0, number: 2, ref: "sp" }] } },
+  });
+  const out = await runNewEpisodes({}, deps(kino));
+  assert.equal(out.posted, 0);
+  assert.deepEqual(stateOf(kino).baselines["136315"], { season: 3, episode: 4 });
+  assert.deepEqual(stateOf(kino).pending, {});
+  assert.equal(kino.calls.some((c) => c[0] === "callAll"), false);
+  // First sight on a special takes no baseline either.
+  const fresh = fakeKino({ tmdb: { 136315: tv(0, 2) } });
+  await runNewEpisodes({}, deps(fresh));
+  assert.deepEqual(stateOf(fresh).baselines, {});
+});
+
+test("a series whose episode no plugin has yet does not block the other series", async () => {
+  const repos = [1, 2, 3, 4, 5].map((n) => `xuper-plugin/kino-plugin-p${n}`);
+  const watched = [
+    { title: "Slow Show", kind: "series", ids: { tmdb: 1 }, watchedAtMs: TODAY0 },
+    { title: "Fast Show", kind: "series", ids: { tmdb: 2 }, watchedAtMs: TODAY0 - DAY },
+  ];
+  const search = {};
+  const episodes = {};
+  for (const r of repos) {
+    search[r] = [{ id: "a", ref: `${r}:slow`, title: "Slow Show", kind: "series", tmdb: 1 }, { id: "b", ref: `${r}:fast`, title: "Fast Show", kind: "series", tmdb: 2 }];
+    episodes[r] = { [`${r}:slow`]: [{ season: 1, number: 1, ref: "s1" }], [`${r}:fast`]: [{ season: 1, number: 1, ref: "f1" }, { season: 1, number: 2, ref: "f2" }] };
+  }
+  const opts = { watched, search, episodes, tmdb: { 1: tv(1, 2, [{ season_number: 1, episode_count: 10 }]), 2: tv(1, 2, [{ season_number: 1, episode_count: 10 }]) } };
+  const kino = fakeKino({ ...opts, state: seen({ 1: { season: 1, episode: 1 }, 2: { season: 1, episode: 1 } }) });
+  const out = await runNewEpisodes({}, deps(kino));
+  const slowCalls = kino.calls.filter((c) => c[2] === "episodes" && c[3].ref.endsWith(":slow")).length;
+  assert.equal(slowCalls, 3, "at most 3 plugins asked for one series a run");
+  assert.equal(out.posted, 1);
+  assert.equal(kino.notices[0].id, "ep-2-s1e2");
+  assert.ok(requestsOf(kino) <= NEW_EP.REQUESTS);
+  assert.ok(stateOf(kino).pending["ep-1-s1e2"], "the slow one stays pending");
+  // Even when the budget runs out on the slow one, the cursor moves past it.
+  const tight = fakeKino({ ...opts, state: seen({ 1: { season: 1, episode: 1 }, 2: { season: 1, episode: 1 } }) });
+  await runNewEpisodes({}, { ...deps(tight), limits: { ...NEW_EP, REQUESTS: 5 } });
+  assert.equal(stateOf(tight).cursor, 1);
+});
+
+test("a whole season released at once notifies its first unwatched episode, not the finale", async () => {
+  const seasons = [{ season_number: 1, episode_count: 10 }, { season_number: 2, episode_count: 8 }];
+  const watched = [{ title: "The Bear", kind: "series", ids: { tmdb: 136315 }, watchedAtMs: TODAY0, season: 1, episode: 10 }];
+  const kino = fakeKino({
+    watched,
+    tmdb: { 136315: tv(2, 8, seasons) },
+    state: seen({ 136315: { season: 1, episode: 10 } }),
+    search: bearSearch,
+    episodes: { [HDFULL]: { "hd:bear": Array.from({ length: 8 }, (_, i) => ({ season: 2, number: i + 1, ref: `e${i + 1}` })) } },
+  });
+  const out = await runNewEpisodes({}, deps(kino));
+  assert.equal(out.posted, 1);
+  assert.equal(kino.notices[0].id, "ep-136315-s2e1");
+  assert.equal(kino.notices[0].text, "T2·E1 ya está en HDFull");
+  assert.deepEqual(kino.notices[0].go.episode, { origin: HDFULL, ref: "hd:bear", season: 2, episode: 1 });
+  assert.deepEqual(stateOf(kino).baselines["136315"], { season: 2, episode: 8 }, "one notice covers the whole drop");
+
+  // The next one is in an earlier season than the last aired: TMDB's season data confirms it (one more request).
+  const mid = fakeKino({
+    watched: [{ ...watched[0], season: 1, episode: 5 }],
+    tmdb: { 136315: tv(2, 3, seasons), "/tv/136315/season/1": { episodes: [{ episode_number: 6, air_date: "2026-10-01" }] } },
+    state: seen({ 136315: { season: 1, episode: 5 } }),
+    search: bearSearch,
+    episodes: { [HDFULL]: { "hd:bear": Array.from({ length: 10 }, (_, i) => ({ season: 1, number: i + 1, ref: `e${i + 1}` })) } },
+  });
+  const o2 = await runNewEpisodes({}, deps(mid));
+  assert.equal(o2.posted, 1);
+  assert.equal(mid.notices[0].id, "ep-136315-s1e6");
+  assert.ok(mid.calls.some((c) => c[0] === "tmdb" && c[1] === "/tv/136315/season/1"));
+  assert.equal(requestsOf(mid), 4);
+});
+
+test("pending entries are pruned after 7 days", async () => {
+  // The series' TMDB answer fails this run: its expired pending id is pruned anyway (and dropped: the baseline moves up).
+  const k1 = fakeKino({ tmdb: {}, state: { cursor: 0, baselines: { 136315: { season: 3, episode: 4 } }, pending: { "ep-136315-s3e5": NOW - 8 * DAY }, notified: [] } });
+  await runNewEpisodes({}, deps(k1));
+  assert.deepEqual(stateOf(k1).pending, {});
+  assert.deepEqual(stateOf(k1).baselines["136315"], { season: 3, episode: 5 });
+  // A superseded episode's pending id goes when the series is checked.
+  const k2 = fakeKino({
+    tmdb: { 136315: tv(3, 5) },
+    state: { cursor: 0, baselines: { 136315: { season: 3, episode: 4 } }, pending: { "ep-136315-s3e3": NOW - DAY }, notified: [] },
+    search: bearSearch,
+    episodes: { [HDFULL]: { "hd:bear": bearEps(4) } },
+  });
+  await runNewEpisodes({}, deps(k2));
+  assert.deepEqual(Object.keys(stateOf(k2).pending), ["ep-136315-s3e5"]);
+});
+
+test("an absolute-numbered played episode is not re-notified", async () => {
+  const seasons = [{ season_number: 1, episode_count: 28 }, { season_number: 2, episode_count: 12 }];
+  const anime = (played) => fakeKino({
+    watched: [{ title: "Sousou no Frieren", kind: "series", ids: { tmdb: 209867 }, watchedAtMs: TODAY0, season: 1, episode: played }],
+    tmdb: { 209867: tv(2, 2, seasons) },
+    state: seen({ 209867: { season: 2, episode: 1 } }),
+    search: { [ANIME]: [{ id: "f", ref: "an:frieren", title: "Sousou no Frieren", kind: "series" }] },
+    episodes: { [ANIME]: { "an:frieren": Array.from({ length: 30 }, (_, i) => ({ season: 1, number: i + 1, ref: `an:f:${i + 1}` })) } },
+  });
+  const k = anime(30); // 30 straight through = TMDB S2E2, already played
+  assert.equal((await runNewEpisodes({}, deps(k))).posted, 0);
+  assert.deepEqual(stateOf(k).baselines["209867"], { season: 2, episode: 2 });
+  const unknown = anime(99); // beyond TMDB's seasons: unknown, the baseline alone decides
+  const out = await runNewEpisodes({}, deps(unknown));
+  assert.equal(out.posted, 1);
+  assert.equal(unknown.notices[0].id, "ep-209867-s2e2");
 });
