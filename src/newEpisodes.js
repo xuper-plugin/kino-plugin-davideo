@@ -102,7 +102,7 @@ export function matchChapter(chapters, { season, episode, absolute }) {
  * The notice for one new episode. [season]/[episode] are TMDB's (the id and the text); the `go` carries the plugin's own
  * numbering ([chapter], when it differs, e.g. an anime listed straight through) and its series [ref].
  */
-export function noticeOf({ tmdb, title, season, episode, repo, ref, pluginName, chapter }) {
+export function noticeOf({ tmdb, title, season, episode, repo, ref, pluginName, chapter, item }) {
   const name = clip(title, 60);
   const plugin = clip(pluginName, 60);
   const goSeason = chapter && Number.isInteger(chapter.season) ? chapter.season : season;
@@ -113,8 +113,21 @@ export function noticeOf({ tmdb, title, season, episode, repo, ref, pluginName, 
     titleEn: `New episode of ${name}`,
     text: `T${season}·E${episode} ya está en ${plugin}`,
     textEn: `S${season}·E${episode} is now on ${plugin}`,
-    go: { episode: { origin: repo, ref, season: goSeason, episode: goEpisode } },
+    go: { episode: goEpisodeOf({ repo, ref, title, season: goSeason, episode: goEpisode, item }) },
   };
+}
+
+/**
+ * The notice's `go.episode`: the plugin, its series [ref] and its numbering, plus the door [item]'s `id` (Kino keys the
+ * library row by it) and `title` (else the library's), and `adult: true` only when the item says so.
+ */
+function goEpisodeOf({ repo, ref, title, season, episode, item }) {
+  const go = { origin: repo, ref, season, episode };
+  if (item && (typeof item.id === "string" || typeof item.id === "number") && String(item.id)) go.id = String(item.id);
+  const name = clip(item && typeof item.title === "string" && item.title.trim() ? item.title : title, 120);
+  if (name) go.title = name;
+  if (item && item.adult === true) go.adult = true;
+  return go;
 }
 
 /** A search item's TMDB id, wherever the plugin put it. */
@@ -321,10 +334,10 @@ async function run(deps) {
       let chapters;
       try { chapters = await deps.call(a.repo, "episodes", { ref: item.ref }); } catch (_) { continue; }
       const chapter = matchChapter(chapters, { season: target.season, episode: target.episode, absolute });
-      if (chapter) { hit = { repo: a.repo, name: a.name || a.id || a.repo, ref: item.ref, chapter }; break; }
+      if (chapter) { hit = { repo: a.repo, name: a.name || a.id || a.repo, ref: item.ref, item, chapter }; break; }
     }
     if (!hit) { if (listing.length) state.tried[id] = (start + asked) % listing.length; continue; } // pending: asked again on its next turn
-    const notice = noticeOf({ tmdb: c.tmdb, title: c.title, season: target.season, episode: target.episode, repo: hit.repo, ref: hit.ref, pluginName: hit.name, chapter: hit.chapter });
+    const notice = noticeOf({ tmdb: c.tmdb, title: c.title, season: target.season, episode: target.episode, repo: hit.repo, ref: hit.ref, pluginName: hit.name, chapter: hit.chapter, item: hit.item });
     try {
       await deps.notify(notice);
     } catch (e) {

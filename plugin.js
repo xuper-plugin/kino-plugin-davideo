@@ -1472,7 +1472,7 @@ function matchChapter(chapters, { season, episode, absolute }) {
   if (seasons.size === 1 && posInt(absolute)) return list.find((c) => c.number === absolute) || null;
   return null;
 }
-function noticeOf2({ tmdb, title, season, episode, repo, ref, pluginName, chapter }) {
+function noticeOf2({ tmdb, title, season, episode, repo, ref, pluginName, chapter, item }) {
   const name = clip2(title, 60);
   const plugin = clip2(pluginName, 60);
   const goSeason = chapter && Number.isInteger(chapter.season) ? chapter.season : season;
@@ -1483,8 +1483,16 @@ function noticeOf2({ tmdb, title, season, episode, repo, ref, pluginName, chapte
     titleEn: `New episode of ${name}`,
     text: `T${season}·E${episode} ya está en ${plugin}`,
     textEn: `S${season}·E${episode} is now on ${plugin}`,
-    go: { episode: { origin: repo, ref, season: goSeason, episode: goEpisode } }
+    go: { episode: goEpisodeOf({ repo, ref, title, season: goSeason, episode: goEpisode, item }) }
   };
+}
+function goEpisodeOf({ repo, ref, title, season, episode, item }) {
+  const go = { origin: repo, ref, season, episode };
+  if (item && (typeof item.id === "string" || typeof item.id === "number") && String(item.id)) go.id = String(item.id);
+  const name = clip2(item && typeof item.title === "string" && item.title.trim() ? item.title : title, 120);
+  if (name) go.title = name;
+  if (item && item.adult === true) go.adult = true;
+  return go;
 }
 var itemTmdb = (it) => posInt(it.tmdb) ? it.tmdb : it.ids && posInt(it.ids.tmdb) ? it.ids.tmdb : 0;
 function pickItem(items, { tmdb, title }) {
@@ -1706,7 +1714,7 @@ async function run(deps) {
       }
       const chapter = matchChapter(chapters, { season: target.season, episode: target.episode, absolute });
       if (chapter) {
-        hit = { repo: a.repo, name: a.name || a.id || a.repo, ref: item.ref, chapter };
+        hit = { repo: a.repo, name: a.name || a.id || a.repo, ref: item.ref, item, chapter };
         break;
       }
     }
@@ -1714,7 +1722,7 @@ async function run(deps) {
       if (listing.length) state.tried[id] = (start + asked) % listing.length;
       continue;
     }
-    const notice = noticeOf2({ tmdb: c.tmdb, title: c.title, season: target.season, episode: target.episode, repo: hit.repo, ref: hit.ref, pluginName: hit.name, chapter: hit.chapter });
+    const notice = noticeOf2({ tmdb: c.tmdb, title: c.title, season: target.season, episode: target.episode, repo: hit.repo, ref: hit.ref, pluginName: hit.name, chapter: hit.chapter, item: hit.item });
     try {
       await deps.notify(notice);
     } catch (e) {

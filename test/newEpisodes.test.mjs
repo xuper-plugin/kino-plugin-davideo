@@ -170,7 +170,7 @@ test("posts when TMDB has a newer episode and a plugin lists it", async () => {
     titleEn: "New episode of The Bear",
     text: "T3·E5 ya está en HDFull",
     textEn: "S3·E5 is now on HDFull",
-    go: { episode: { origin: HDFULL, ref: "hd:bear", season: 3, episode: 5 } },
+    go: { episode: { origin: HDFULL, ref: "hd:bear", season: 3, episode: 5, id: "1", title: "The Bear" } },
   }]);
   const search = kino.calls.find((c) => c[0] === "callAll" && c[2] === "search");
   assert.deepEqual(search.slice(1, 4), ["mine", "search", { q: "The Bear", type: "series", tmdb: 136315 }]);
@@ -186,7 +186,14 @@ test("noticeOf carries the plugin's own numbering in go", () => {
   const n = noticeOf({ tmdb: 37854, title: "One Piece", season: 2, episode: 3, repo: ANIME, ref: "an:op", pluginName: "Animes ES", chapter: { season: 1, number: 15, ref: "x" } });
   assert.equal(n.id, "ep-37854-s2e3");
   assert.equal(n.text, "T2·E3 ya está en Animes ES");
-  assert.deepEqual(n.go, { episode: { origin: ANIME, ref: "an:op", season: 1, episode: 15 } });
+  assert.deepEqual(n.go, { episode: { origin: ANIME, ref: "an:op", season: 1, episode: 15, title: "One Piece" } }, "no door item: the library title, no id");
+  // The door item lends its id and title; adult only when it says adult === true.
+  const base = { tmdb: 37854, title: "One Piece", season: 2, episode: 3, repo: ANIME, ref: "an:op", pluginName: "Animes ES" };
+  assert.deepEqual(noticeOf({ ...base, item: { id: "op-1", ref: "an:op", title: "One Piece (TV)", kind: "series" } }).go.episode,
+    { origin: ANIME, ref: "an:op", season: 2, episode: 3, id: "op-1", title: "One Piece (TV)" });
+  assert.equal(noticeOf({ ...base, item: { id: "op-1", ref: "an:op", title: "One Piece", adult: true } }).go.episode.adult, true);
+  assert.equal("adult" in noticeOf({ ...base, item: { id: "op-1", ref: "an:op", title: "One Piece", adult: "yes" } }).go.episode, false);
+  assert.equal(noticeOf({ ...base, item: { id: "op-1", ref: "an:op", title: "  " } }).go.episode.title, "One Piece", "a blank item title falls back");
 });
 
 test("retries for 7 days when no plugin has it yet, then drops it", async () => {
@@ -226,7 +233,7 @@ test("matches an anime by absolute number on a one-season plugin", async () => {
   assert.equal(out.posted, 1);
   assert.equal(kino.notices[0].id, "ep-209867-s2e3");
   assert.equal(kino.notices[0].text, "T2·E3 ya está en Animes ES");
-  assert.deepEqual(kino.notices[0].go, { episode: { origin: ANIME, ref: "an:frieren", season: 1, episode: 31 } });
+  assert.deepEqual(kino.notices[0].go, { episode: { origin: ANIME, ref: "an:frieren", season: 1, episode: 31, id: "f", title: "Sousou no Frieren" } });
 });
 
 test("skips a plugin that matches neither", async () => {
@@ -430,7 +437,7 @@ test("a whole season released at once notifies its first unwatched episode, not 
   assert.equal(out.posted, 1);
   assert.equal(kino.notices[0].id, "ep-136315-s2e1");
   assert.equal(kino.notices[0].text, "T2·E1 ya está en HDFull");
-  assert.deepEqual(kino.notices[0].go.episode, { origin: HDFULL, ref: "hd:bear", season: 2, episode: 1 });
+  assert.deepEqual(kino.notices[0].go.episode, { origin: HDFULL, ref: "hd:bear", season: 2, episode: 1, id: "1", title: "The Bear" });
   assert.deepEqual(stateOf(kino).baselines["136315"], { season: 2, episode: 8 }, "one notice covers the whole drop");
 
   // The next one is in an earlier season than the last aired: TMDB's season data confirms it (one more request).
