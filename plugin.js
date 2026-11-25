@@ -1399,6 +1399,7 @@ var MAX_NOTIFIED = 500;
 var DAY_MS = 864e5;
 var ALIAS = "mine";
 var EPISODES_PER_SERIES = 3;
+var MAX_GO_ID = 128;
 var fold = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "");
 var clip2 = (s, n) => {
   const t = String(s || "").trim();
@@ -1488,7 +1489,8 @@ function noticeOf2({ tmdb, title, season, episode, repo, ref, pluginName, chapte
 }
 function goEpisodeOf({ repo, ref, title, season, episode, item }) {
   const go = { origin: repo, ref, season, episode };
-  if (item && (typeof item.id === "string" || typeof item.id === "number") && String(item.id)) go.id = String(item.id);
+  const id = item && (typeof item.id === "string" || typeof item.id === "number") ? String(item.id) : "";
+  if (id && id.length <= MAX_GO_ID) go.id = id;
   const name = clip2(item && typeof item.title === "string" && item.title.trim() ? item.title : title, 120);
   if (name) go.title = name;
   if (item && item.adult === true) go.adult = true;

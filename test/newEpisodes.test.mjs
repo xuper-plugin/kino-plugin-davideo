@@ -191,9 +191,16 @@ test("noticeOf carries the plugin's own numbering in go", () => {
   const base = { tmdb: 37854, title: "One Piece", season: 2, episode: 3, repo: ANIME, ref: "an:op", pluginName: "Animes ES" };
   assert.deepEqual(noticeOf({ ...base, item: { id: "op-1", ref: "an:op", title: "One Piece (TV)", kind: "series" } }).go.episode,
     { origin: ANIME, ref: "an:op", season: 2, episode: 3, id: "op-1", title: "One Piece (TV)" });
-  assert.equal(noticeOf({ ...base, item: { id: "op-1", ref: "an:op", title: "One Piece", adult: true } }).go.episode.adult, true);
-  assert.equal("adult" in noticeOf({ ...base, item: { id: "op-1", ref: "an:op", title: "One Piece", adult: "yes" } }).go.episode, false);
-  assert.equal(noticeOf({ ...base, item: { id: "op-1", ref: "an:op", title: "  " } }).go.episode.title, "One Piece", "a blank item title falls back");
+  assert.deepEqual(noticeOf({ ...base, item: { id: "op-1", ref: "an:op", title: "One Piece", adult: true } }).go,
+    { episode: { origin: ANIME, ref: "an:op", season: 2, episode: 3, id: "op-1", title: "One Piece", adult: true } });
+  assert.deepEqual(noticeOf({ ...base, item: { id: "op-1", ref: "an:op", title: "One Piece", adult: "yes" } }).go,
+    { episode: { origin: ANIME, ref: "an:op", season: 2, episode: 3, id: "op-1", title: "One Piece" } }, "adult only when === true");
+  assert.deepEqual(noticeOf({ ...base, item: { id: "op-1", ref: "an:op", title: "  " } }).go,
+    { episode: { origin: ANIME, ref: "an:op", season: 2, episode: 3, id: "op-1", title: "One Piece" } }, "a blank item title falls back");
+  // An id over 128 characters is left out (Kino would drop the whole go), never cut; 128 exactly is kept.
+  assert.deepEqual(noticeOf({ ...base, item: { id: "x".repeat(129), ref: "an:op", title: "One Piece" } }).go,
+    { episode: { origin: ANIME, ref: "an:op", season: 2, episode: 3, title: "One Piece" } });
+  assert.equal(noticeOf({ ...base, item: { id: "x".repeat(128), ref: "an:op", title: "One Piece" } }).go.episode.id, "x".repeat(128));
 });
 
 test("retries for 7 days when no plugin has it yet, then drops it", async () => {

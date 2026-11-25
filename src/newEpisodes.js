@@ -15,6 +15,8 @@ const DAY_MS = 86400000;
 const ALIAS = "mine";
 /** At most this many plugins' `episodes` asked for one series in one run. */
 export const EPISODES_PER_SERIES = 3;
+/** The longest item id Kino takes in go.episode. */
+export const MAX_GO_ID = 128;
 
 /** Lower case, no accents, letters and digits only: how titles are compared. */
 const fold = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "");
@@ -123,7 +125,9 @@ export function noticeOf({ tmdb, title, season, episode, repo, ref, pluginName, 
  */
 function goEpisodeOf({ repo, ref, title, season, episode, item }) {
   const go = { origin: repo, ref, season, episode };
-  if (item && (typeof item.id === "string" || typeof item.id === "number") && String(item.id)) go.id = String(item.id);
+  // Kino drops the whole go over an id longer than MAX_GO_ID: such an id is left out, never cut (a cut id keys another row).
+  const id = item && (typeof item.id === "string" || typeof item.id === "number") ? String(item.id) : "";
+  if (id && id.length <= MAX_GO_ID) go.id = id;
   const name = clip(item && typeof item.title === "string" && item.title.trim() ? item.title : title, 120);
   if (name) go.title = name;
   if (item && item.adult === true) go.adult = true;
