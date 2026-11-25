@@ -74,14 +74,14 @@ test("the page (design C): home-screen icons, yours then the ones to install, Ed
   assert.ok(!byKey(tree, "searchButton"));
   assert.equal(byKey(tree, "close").icon, "arrow_back");
   // Yours: the heart first, then HDFull and Seriesflix; a tap on any asks for its sheet.
-  assert.deepEqual(byKey(tree, "mineGrid").children.map((c) => c.key), ["card-0", "card-4", "card-24"]);
+  assert.deepEqual(byKey(tree, "mineGrid").children.map((c) => c.key), ["card-0", "card-4", "card-25"]);
   assert.deepEqual(byKey(tree, "card-4").onTap, { event: "pick", arg: HDFULL });
   // «Nueva» on the ones with an update (the heart and Seriesflix); «Configurar» on HDFull, which needs its setup.
-  assert.ok(byKey(tree, "new-0") && byKey(tree, "new-24") && byKey(tree, "setup-4"));
-  // The rest: dimmed, with a download button each (27 of them); Ultra Hd is the first after HDFull (owner, 2026-11-24).
+  assert.ok(byKey(tree, "new-0") && byKey(tree, "new-25") && byKey(tree, "setup-4"));
+  // The rest: dimmed, with a download button each (28 of them); Ultra Hd is the first after HDFull (owner, 2026-11-24).
   const installs = nodes(tree).filter((n) => n.onPressed && n.onPressed.go && n.onPressed.go.installPlugin);
-  assert.equal(installs.length, 27);
-  assert.equal(byKey(tree, "missingGrid").children.length, 27);
+  assert.equal(installs.length, 28);
+  assert.equal(byKey(tree, "missingGrid").children.length, 28);
   assert.deepEqual(byKey(tree, "install-5").onPressed, { go: { installPlugin: { repo: ULTRAHD } } });
   // To install: Xuper, Movie+, ZappTV, then Ultra Hd where HDFull (installed, card-4) would be next.
   assert.deepEqual(byKey(tree, "missingGrid").children.slice(0, 4).map((c) => c.key), ["card-1", "card-2", "card-3", "card-5"]);
@@ -363,7 +363,7 @@ test("catalog.json drives the page and the search: fetched on open, its order an
   const tree = await p.screen({ state: o.state, device: "phone", installed: {} });
   const installs = nodes(tree).filter((n) => n.onPressed && n.onPressed.go && n.onPressed.go.installPlugin).map((n) => n.onPressed.go.installPlugin.repo);
   assert.ok(!installs.includes(ULTRAHD));
-  assert.equal(installs.length, 26);
+  assert.equal(installs.length, 27);
   assert.ok(p.searchRank(SERIESFLIX) < p.searchRank(HDFULL));
   assert.equal(cat.catalogSource, "fetched");
   cat.resetCatalog();

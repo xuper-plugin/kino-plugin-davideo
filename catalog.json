@@ -35,6 +35,12 @@
       "kind": "movies"
     },
     {
+      "repo": "xuper-plugin/kino-plugin-kingred",
+      "name": "KingRed",
+      "kind": "movies",
+      "needsResolver": true
+    },
+    {
       "repo": "xuper-plugin/kino-plugin-animes-es",
       "name": "AnimES",
       "kind": "anime"

@@ -810,6 +810,8 @@ var BUILT_IN_PLUGINS = [
   // Movies, series and live TV from the service's own servers (no resolver, no setup: it picks a server by itself); its
   // catalog door (0.8.8) answers the search from its title index. Its Home is its own encrypted feed, not a ready std Home.
   { repo: "xuper-plugin/kino-plugin-ultrahd", name: "Ultra Hd", kind: "movies" },
+  // Movies and series of the KingRed catalog, played through the resolver; its catalog door (0.3.0) answers search and episodes.
+  { repo: "xuper-plugin/kino-plugin-kingred", name: "KingRed", kind: "movies", needsResolver: true },
   { repo: "xuper-plugin/kino-plugin-animes-es", name: "AnimES", kind: "anime" },
   // Documentaries in Spanish from their own site (no resolver); its catalog door (0.2.5) answers the search.
   { repo: "xuper-plugin/kino-plugin-areadocumental", name: "Área Documental", kind: "docs" },

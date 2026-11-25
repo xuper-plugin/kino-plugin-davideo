@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.1
+
+- KingRed joins the plugins Da-Video searches and offers to install
+
 ## 0.5.0
 
 - Tells you when a new episode of a series you watch is on one of your plugins (needs Kino 0.9.94)
