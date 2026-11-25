@@ -1159,7 +1159,7 @@ var PAGE_EVENTS = {
   },
   // Kino starts every job off: the person's own tap turns the 4-hourly update on (enableJob; Kino drops it from a timer).
   pick({ arg }) {
-    return typeof arg === "string" ? { state: { pick: arg }, ui: [{ open: "pluginSheet" }] } : null;
+    return typeof arg === "string" ? { state: { pick: arg }, ui: [{ open: "pluginSheet" }, { focus: sheetMainKey(arg) }] } : null;
   },
   unpick() {
     return { state: { pick: null } };
@@ -1237,6 +1237,11 @@ function pluginTile(entry, row, i) {
   return { ...tile, key: `card-${i}` };
 }
 var grid = (key, tiles) => ({ type: "GridView", key, columns: { compact: 3, medium: 4, expanded: 6 }, gap: 16, children: tiles });
+function sheetMainKey(repo) {
+  const entry = [RESOLVER, ...PLUGINS].find((p) => p.repo === repo);
+  const resolverMissing = !!entry && entry.needsResolver === true && !!lastStatus && !!lastStatus.plugins && !lastStatus.plugins[RESOLVER.repo];
+  return resolverMissing ? "sheetResolver" : "sheetOpen";
+}
 function pluginSheet(state, st) {
   const entry = state && state.pick ? [RESOLVER, ...PLUGINS].find((p) => p.repo === state.pick) : null;
   const row = entry ? st.plugins[entry.repo] : null;

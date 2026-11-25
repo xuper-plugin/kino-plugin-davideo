@@ -84,7 +84,7 @@ test("the page (design C): home-screen icons, yours then the ones to install, Ed
   assert.deepEqual(byKey(tree, "missingGrid").children.slice(0, 4).map((c) => c.key), ["card-1", "card-2", "card-3", "card-5"]);
   // The sheet: Abrir, Configurar (HDFull needs its setup), Desinstalar; never Desinstalar for the heart.
   const pk = await p.screenEvent({ name: "pick", arg: HDFULL, state: o.state });
-  assert.deepEqual(pk.ui, [{ open: "pluginSheet" }]);
+  assert.deepEqual(pk.ui, [{ open: "pluginSheet" }, { focus: "sheetOpen" }], "the sheet opens with the focus on its main button (TV, owner 2026-11-24)");
   const te = await p.screen({ state: { ...o.state, ...pk.state }, device: "phone", installed: {} });
   assert.deepEqual(byKey(te, "sheetOpen").onPressed, { go: { plugin: { repo: HDFULL } } });
   // Still to set up: the main button is Configurar and opens its own screen.

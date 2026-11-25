@@ -96,7 +96,9 @@ export const PAGE_EVENTS = {
   },
   // Kino starts every job off: the person's own tap turns the 4-hourly update on (enableJob; Kino drops it from a timer).
   pick({ arg }) {
-    return typeof arg === "string" ? { state: { pick: arg }, ui: [{ open: "pluginSheet" }] } : null;
+    // Focus goes to the sheet's main button (Configurar / Abrir, or Instalar resolver): on a TV the sheet otherwise opened with
+    // the focus left on the grid behind it (owner on the KALLEY, 2026-11-24, Kino 0.9.93).
+    return typeof arg === "string" ? { state: { pick: arg }, ui: [{ open: "pluginSheet" }, { focus: sheetMainKey(arg) }] } : null;
   },
   unpick() {
     return { state: { pick: null } };
@@ -187,6 +189,13 @@ const grid = (key, tiles) => ({ type: "GridView", key, columns: { compact: 3, me
  * The sheet a tap on an installed icon opens: its icon and name, Abrir, and Desinstalar below it (never for the heart, Kino
  * Resolver, which Da-Video keeps). Declared once; its body follows `state.pick`.
  */
+/** The key of [repo]'s sheet main button, as [pluginSheet] draws it: Instalar resolver while the resolver it needs is missing. */
+function sheetMainKey(repo) {
+  const entry = [RESOLVER, ...PLUGINS].find((p) => p.repo === repo);
+  const resolverMissing = !!entry && entry.needsResolver === true && !!lastStatus && !!lastStatus.plugins && !lastStatus.plugins[RESOLVER.repo];
+  return resolverMissing ? "sheetResolver" : "sheetOpen";
+}
+
 function pluginSheet(state, st) {
   const entry = state && state.pick ? [RESOLVER, ...PLUGINS].find((p) => p.repo === state.pick) : null;
   const row = entry ? st.plugins[entry.repo] : null;
