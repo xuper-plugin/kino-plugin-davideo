@@ -14,6 +14,9 @@ function fakeKino(over = {}) {
   const calls = [];
   const kino = {
     calls,
+    // As real Kino: apiVersion is Kino's own (34 = before the new-episode notices), pluginApiVersion Da-Video's declared 31.
+    apiVersion: 34,
+    pluginApiVersion: 31,
     storage: { get: (k) => (m.has(k) ? m.get(k) : null), set: (k, v) => m.set(k, v), remove: (k) => m.delete(k) },
     log() {},
     jobOn: () => over.jobOn ?? false,
@@ -371,12 +374,12 @@ import { readFileSync } from "node:fs";
 
 test("the episodes job runs runNewEpisodes", async () => {
   // Below 35 runNewEpisodes answers kino_too_old: the job hands that answer back, it never runs the update pass.
-  const kino = { ...fakeKino(), pluginApiVersion: 31 };
+  const kino = { ...fakeKino(), apiVersion: 34, pluginApiVersion: 31 };
   const p = await load(kino);
   assert.deepEqual(await p.job({ id: "episodes", reason: "scheduled" }), { skipped: "kino_too_old" });
   assert.deepEqual(kino.calls.filter((c) => c[0] === "updateAll"), []);
   // On 35 with no library it reaches the next check: proof it is runNewEpisodes deciding.
-  const k35 = { ...fakeKino(), pluginApiVersion: 35 };
+  const k35 = { ...fakeKino(), apiVersion: 35, pluginApiVersion: 31 };
   const p35 = await load(k35);
   assert.deepEqual(await p35.job({ id: "episodes", reason: "scheduled" }), { skipped: "library_denied" });
   assert.equal(await p35.job({ id: "nope" }), null);
@@ -401,16 +404,16 @@ test("the page offers the switch only on Kino 35+", async () => {
     o.state.dvTab = "mine";
     return { p, o, tree: await p.screen({ state: o.state, device: "phone", installed: {} }) };
   };
-  const old = await draw({ pluginApiVersion: 31 });
+  const old = await draw({ apiVersion: 34, pluginApiVersion: 31 });
   assert.ok(!byKey(old.tree, "episodesCard"), "no switch below 35");
-  const off = await draw({ pluginApiVersion: 35, jobOn: (id) => id === "update" });
+  const off = await draw({ apiVersion: 35, pluginApiVersion: 31, jobOn: (id) => id === "update" });
   assert.equal(byKey(off.tree, "episodesTitle").text, "Avísame de capítulos nuevos");
   assert.equal(byKey(off.tree, "episodesTitle").textEn, "Tell me about new episodes");
   assert.equal(byKey(off.tree, "episodesHint").text, "Te aviso cuando sale un capítulo nuevo de una serie que ves y ya está en uno de tus plugins.");
   assert.equal(byKey(off.tree, "episodesHint").textEn, "I'll tell you when a new episode of a series you watch is out and already on one of your plugins.");
   assert.deepEqual(byKey(off.tree, "enableEpisodes").onPressed, { event: "enableEpisodes" });
   assert.deepEqual(await off.p.screenEvent({ name: "enableEpisodes", state: off.o.state }), { enableJob: "episodes", state: { episodesOn: true } });
-  const on = await draw({ pluginApiVersion: 35, jobOn: () => true });
+  const on = await draw({ apiVersion: 35, pluginApiVersion: 31, jobOn: () => true });
   assert.ok(byKey(on.tree, "episodesCard") && !byKey(on.tree, "enableEpisodes"), "on: the line stays, no button");
   for (const lang of ["es", "en"]) for (const t of [off.tree, on.tree]) {
     assert.deepEqual(kit.checkScreenTree(fold(t), lang, undefined, { apiVersion: 31 }).dropped, [], lang);

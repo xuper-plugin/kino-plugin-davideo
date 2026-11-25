@@ -35,7 +35,9 @@ function fakeKino(over = {}) {
   const names = { [HDFULL]: "HDFull", [SERIESFLIX]: "Seriesflix", [ANIME]: "Animes ES" };
   const kino = {
     calls, notices, store,
-    pluginApiVersion: over.apiVersion ?? 35,
+    // As real Kino: apiVersion is Kino's own, pluginApiVersion the plugin's declared one (Da-Video: 31).
+    apiVersion: over.apiVersion ?? 35,
+    pluginApiVersion: 31,
     storage: { get: (k) => (store.has(k) ? store.get(k) : null), set: (k, v) => store.set(k, v), remove: (k) => store.delete(k) },
     library: {
       async watched(opts) {
@@ -360,7 +362,7 @@ test("quiet when Kino is older", async () => {
   assert.deepEqual(await runNewEpisodes({}, deps(kino)), { skipped: "kino_too_old" });
   assert.equal(kino.calls.length, 0);
   const prev = globalThis.kino;
-  globalThis.kino = { pluginApiVersion: 31 };
+  globalThis.kino = { apiVersion: 34, pluginApiVersion: 31 };
   try { assert.deepEqual(await runNewEpisodes({}), { skipped: "kino_too_old" }); } finally { globalThis.kino = prev; }
 });
 
@@ -540,4 +542,95 @@ test("the check's own expiry still raises the baseline to the last aired episode
   assert.deepEqual(stateOf(kino).pending, {});
   assert.deepEqual(stateOf(kino).tried, {});
   assert.equal(kino.calls.some((c) => c[0] === "callAll"), false);
+});
+
+// Final review fixes.
+
+test("the feature runs on Kino 35 although Da-Video declares apiVersion 31", async () => {
+  // Real Kino: kino.apiVersion is Kino's own, kino.pluginApiVersion the plugin's declared one (31 for Da-Video).
+  const kino = fakeKino({ tmdb: { 136315: tv(3, 5) }, state: seen({ 136315: { season: 3, episode: 4 } }), search: bearSearch, episodes: { [HDFULL]: { "hd:bear": bearEps(5) } } });
+  assert.equal(kino.apiVersion, 35);
+  assert.equal(kino.pluginApiVersion, 31);
+  assert.equal(bindDeps(kino).apiVersion, 35);
+  const out = await runNewEpisodes({}, deps(kino));
+  assert.deepEqual(out, { checked: 1, posted: 1 });
+  assert.equal(kino.notices[0].id, "ep-136315-s3e5");
+});
+
+test("a run stopped mid-way keeps the notices it already posted and moves the cursor", async () => {
+  const watched = [
+    KINO_LIBRARY_FIXTURE.watched[0],
+    { title: "Slow Show", kind: "series", ids: { tmdb: 4242 }, watchedAtMs: TODAY0 - 3 * DAY, season: 1, episode: 1 },
+  ];
+  const opts = { watched, search: bearSearch, episodes: { [HDFULL]: { "hd:bear": bearEps(5) } } };
+  const first = { cursor: 0, baselines: { 136315: { season: 3, episode: 4 }, 4242: { season: 1, episode: 1 } }, pending: {}, notified: [] };
+
+  // Kino cuts the run (20 s) while the second series' TMDB call hangs: the run never ends, save(true) never comes.
+  const kino = fakeKino({ ...opts, tmdb: { 136315: tv(3, 5) }, state: first });
+  const real = kino.tmdb;
+  let reached;
+  const stuck = new Promise((r) => { reached = r; });
+  kino.tmdb = (path, p) => (path.startsWith("/tv/4242") ? (reached(), new Promise(() => {})) : real(path, p));
+  const run = runNewEpisodes({}, deps(kino)); // never settles
+  await Promise.race([stuck, run.then((o) => assert.fail(`the run ended before the second series: ${JSON.stringify(o)}`))]);
+  assert.equal(kino.notices.length, 1);
+  const st = stateOf(kino);
+  assert.deepEqual(st.notified, ["ep-136315-s3e5"], "the posted notice is remembered");
+  assert.deepEqual(st.baselines["136315"], { season: 3, episode: 5 });
+  assert.equal(st.cursor, 1, "the next run starts at the series it never finished");
+
+  // The next run never posts that notice again and starts at Slow Show.
+  const next = fakeKino({ ...opts, tmdb: { 136315: tv(3, 5), 4242: tv(1, 1) }, state: st });
+  const out = await runNewEpisodes({}, deps(next));
+  assert.equal(out.posted, 0);
+  assert.equal(next.notices.length, 0);
+  assert.equal(next.calls.find((c) => c[0] === "tmdb")[1], "/tv/4242");
+
+  // A run that throws right after its first post (the clock blows up) keeps it too.
+  const boom = fakeKino({ ...opts, tmdb: { 136315: tv(3, 5), 4242: tv(1, 1) }, state: first });
+  const d = { ...bindDeps(boom), now: () => { if (boom.notices.length) throw new Error("cut"); return NOW; } };
+  const r = await runNewEpisodes({}, d);
+  assert.equal(r.skipped, "error:error");
+  assert.deepEqual(stateOf(boom).notified, ["ep-136315-s3e5"]);
+  assert.equal(stateOf(boom).cursor, 1);
+});
+
+test("no door call starts after the 9 s deadline", async () => {
+  // A slow world: every TMDB and door call takes 5 s of the run.
+  let t = NOW;
+  const kino = fakeKino({ tmdb: { 136315: tv(3, 5) }, state: seen({ 136315: { season: 3, episode: 4 } }), search: bearSearch, episodes: { [HDFULL]: { "hd:bear": bearEps(5) } } });
+  const tmdb = kino.tmdb;
+  const callAll = kino.plugins.callAll;
+  kino.tmdb = async (...a) => { const r = await tmdb(...a); t += 5000; return r; };
+  kino.plugins.callAll = async (...a) => { const r = await callAll(...a); t += 5000; return r; };
+  const out = await runNewEpisodes({}, { ...bindDeps(kino), now: () => t });
+  // TMDB (0 -> 5 s), search (5 -> 10 s): the episodes call would start past 9 s, so it never does.
+  assert.deepEqual(out, { checked: 1, posted: 0 });
+  assert.equal(kino.calls.filter((c) => c[2] === "episodes").length, 0);
+  assert.equal(kino.notices.length, 0);
+  const st = stateOf(kino);
+  assert.ok("ep-136315-s3e5" in st.pending, "still pending: asked again next run");
+  assert.equal(st.cursor, 0, "the unfinished series goes first next run");
+
+  // Past the deadline before a series even starts: no TMDB call for it.
+  t = NOW;
+  const two = fakeKino({
+    watched: [KINO_LIBRARY_FIXTURE.watched[0], { title: "Other", kind: "series", ids: { tmdb: 77 }, watchedAtMs: TODAY0 - 3 * DAY }],
+    tmdb: { 136315: tv(3, 4), 77: tv(1, 2) }, state: seen({ 136315: { season: 3, episode: 4 } }),
+  });
+  const tmdb2 = two.tmdb;
+  two.tmdb = async (...a) => { const r = await tmdb2(...a); t += 9500; return r; };
+  await runNewEpisodes({}, { ...bindDeps(two), now: () => t });
+  assert.deepEqual(two.calls.filter((c) => c[0] === "tmdb").map((c) => c[1]), ["/tv/136315"]);
+  assert.equal(stateOf(two).cursor, 1);
+});
+
+test("an id with characters Kino refuses is left out", () => {
+  const base = { tmdb: 37854, title: "One Piece", season: 2, episode: 3, repo: ANIME, ref: "an:op", pluginName: "Animes ES" };
+  for (const id of ["op 1", "op/1", "op:1", "ópera", "a?b", ""]) {
+    assert.equal("id" in noticeOf({ ...base, item: { id, ref: "an:op", title: "One Piece" } }).go.episode, false, JSON.stringify(id));
+  }
+  for (const id of ["op-1", "A.b_c~d-9", 12345]) {
+    assert.equal(noticeOf({ ...base, item: { id, ref: "an:op", title: "One Piece" } }).go.episode.id, String(id));
+  }
 });

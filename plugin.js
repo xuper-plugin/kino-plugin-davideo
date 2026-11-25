@@ -1115,7 +1115,7 @@ function episodesJobIsOn() {
 var EPISODES_API = 35;
 var episodesOffered = () => {
   const kino = k2();
-  return !!kino && typeof kino.pluginApiVersion === "number" && kino.pluginApiVersion >= EPISODES_API;
+  return !!kino && typeof kino.apiVersion === "number" && kino.apiVersion >= EPISODES_API;
 };
 function contentWanted(st) {
   const plugins = contentPlugins(st);
@@ -1399,7 +1399,9 @@ var MAX_NOTIFIED = 500;
 var DAY_MS = 864e5;
 var ALIAS = "mine";
 var EPISODES_PER_SERIES = 3;
-var MAX_GO_ID = 128;
+var GO_ID = /^[A-Za-z0-9._~-]{1,128}$/;
+var DEADLINE_MS = 9e3;
+var STORAGE_BUDGET = 240 * 1024;
 var fold = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "");
 var clip2 = (s, n) => {
   const t = String(s || "").trim();
@@ -1408,6 +1410,14 @@ var clip2 = (s, n) => {
 var posInt = (v) => Number.isInteger(v) && v > 0;
 var nonNegInt = (v) => Number.isInteger(v) && v >= 0;
 var errCode = (e) => e && typeof e.code === "string" ? e.code : "error";
+var utf8Len = (s) => {
+  let n = 0;
+  for (let i = 0; i < s.length; i++) {
+    const c = s.charCodeAt(i);
+    n += c < 128 ? 1 : c < 2048 ? 2 : c >= 55296 && c < 56320 ? (i++, 4) : 3;
+  }
+  return n;
+};
 function readState(raw) {
   let o = null;
   try {
@@ -1490,7 +1500,7 @@ function noticeOf2({ tmdb, title, season, episode, repo, ref, pluginName, chapte
 function goEpisodeOf({ repo, ref, title, season, episode, item }) {
   const go = { origin: repo, ref, season, episode };
   const id = item && (typeof item.id === "string" || typeof item.id === "number") ? String(item.id) : "";
-  if (id && id.length <= MAX_GO_ID) go.id = id;
+  if (GO_ID.test(id)) go.id = id;
   const name = clip2(item && typeof item.title === "string" && item.title.trim() ? item.title : title, 120);
   if (name) go.title = name;
   if (item && item.adult === true) go.adult = true;
@@ -1537,7 +1547,8 @@ function nextAfter(seasons, floor, last) {
 function bindDeps(kino) {
   const has = (o, f) => o && typeof o[f] === "function";
   return {
-    apiVersion: kino && typeof kino.pluginApiVersion === "number" ? kino.pluginApiVersion : 0,
+    apiVersion: kino && typeof kino.apiVersion === "number" ? kino.apiVersion : 0,
+    // Kino's own, never kino.pluginApiVersion (Da-Video's 31)
     library: kino && has(kino.library, "watched") ? (opts) => kino.library.watched(opts) : null,
     tmdb: kino && typeof kino.tmdb === "function" ? (path, params) => kino.tmdb(path, params) : null,
     callAll: kino && has(kino.plugins, "callAll") ? (alias, call, arg, opts) => kino.plugins.callAll(alias, call, arg, opts) : null,
@@ -1572,7 +1583,9 @@ async function run(deps) {
   if (!deps.tmdb) return { skipped: "no_tmdb" };
   if (!deps.callAll || !deps.call) return { skipped: "no_federation" };
   if (!deps.storage) return { skipped: "no_storage" };
-  const now = typeof deps.now === "function" ? deps.now() : Date.now();
+  const clock = typeof deps.now === "function" ? () => deps.now() : () => Date.now();
+  const now = clock();
+  const late = () => clock() - now > DEADLINE_MS;
   const today = new Date(now).toISOString().slice(0, 10);
   const L = deps.limits && typeof deps.limits === "object" ? { ...NEW_EP, ...deps.limits } : NEW_EP;
   let watched;
@@ -1602,7 +1615,9 @@ async function run(deps) {
       delete state.tried[k3];
     }
   };
-  const save = () => {
+  let written = 0;
+  let lastSaved = null;
+  const save = (final = false) => {
     const still = new Set((Array.isArray(watched) ? watched : []).filter((e) => e && e.ids && posInt(e.ids.tmdb)).map((e) => String(e.ids.tmdb)));
     const pending = {};
     for (const [k3, v] of Object.entries(state.pending)) {
@@ -1616,16 +1631,24 @@ async function run(deps) {
     const baselines = {};
     for (const [k3, v] of Object.entries(state.baselines)) if (still.has(k3)) baselines[k3] = v;
     const out = { cursor: list.length ? (state.cursor % list.length + (unfinished >= 0 ? unfinished : visited)) % list.length : 0, baselines, pending, tried, notified: state.notified.slice(-MAX_NOTIFIED) };
+    const text2 = JSON.stringify(out);
+    if (text2 === lastSaved) return;
+    const bytes = utf8Len(STORAGE_KEY) + utf8Len(text2);
+    if (!final && written + 2 * bytes > STORAGE_BUDGET) return;
     try {
-      deps.storage.set(STORAGE_KEY, JSON.stringify(out));
+      deps.storage.set(STORAGE_KEY, text2);
+      written += bytes;
+      lastSaved = text2;
     } catch (_) {
     }
   };
+  const checkpoint = () => save(false);
   const later = (i) => {
     if (unfinished < 0) unfinished = i;
   };
   for (let i = 0; i < list.length; i++) {
-    if (summary.posted >= L.MAX_NOTICES || requests >= L.REQUESTS) break;
+    if (i > 0) checkpoint();
+    if (summary.posted >= L.MAX_NOTICES || requests >= L.REQUESTS || late()) break;
     const c = list[i];
     visited = i + 1;
     const key = String(c.tmdb);
@@ -1654,7 +1677,7 @@ async function run(deps) {
     const target = nextAfter(seasons, floor, last);
     if (!target) continue;
     if (target.season !== last.season) {
-      if (requests + 3 > L.REQUESTS) {
+      if (requests + 3 > L.REQUESTS || late()) {
         later(i);
         break;
       }
@@ -1683,7 +1706,7 @@ async function run(deps) {
       delete state.tried[id];
       continue;
     }
-    if (requests + 2 > L.REQUESTS) {
+    if (requests + 2 > L.REQUESTS || late()) {
       later(i);
       break;
     }
@@ -1704,7 +1727,12 @@ async function run(deps) {
     const start = listing.length ? (state.tried[id] || 0) % listing.length : 0;
     let hit = null;
     let asked = 0;
+    let outOfTime = false;
     while (asked < Math.min(EPISODES_PER_SERIES, listing.length) && requests < L.REQUESTS) {
+      if (late()) {
+        outOfTime = true;
+        break;
+      }
       const { a, item } = listing[(start + asked) % listing.length];
       requests++;
       asked++;
@@ -1722,6 +1750,10 @@ async function run(deps) {
     }
     if (!hit) {
       if (listing.length) state.tried[id] = (start + asked) % listing.length;
+      if (outOfTime) {
+        later(i);
+        break;
+      }
       continue;
     }
     const notice = noticeOf2({ tmdb: c.tmdb, title: c.title, season: target.season, episode: target.episode, repo: hit.repo, ref: hit.ref, pluginName: hit.name, chapter: hit.chapter, item: hit.item });
@@ -1730,7 +1762,7 @@ async function run(deps) {
     } catch (e) {
       const code = errCode(e);
       if (code === "permission_denied" || code === "not_allowed") {
-        save();
+        save(true);
         return { ...summary, skipped: "notifications_denied" };
       }
       continue;
@@ -1741,8 +1773,9 @@ async function run(deps) {
     delete state.pending[id];
     delete state.tried[id];
     raise(key, last);
+    checkpoint();
   }
-  save();
+  save(true);
   return summary;
 }
 

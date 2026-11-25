@@ -47,7 +47,7 @@ export function episodesJobIsOn() {
 
 /** The new-episodes job needs Kino's apiVersion 35 (kino.plugins and the episode notice in a job). */
 const EPISODES_API = 35;
-const episodesOffered = () => { const kino = k(); return !!kino && typeof kino.pluginApiVersion === "number" && kino.pluginApiVersion >= EPISODES_API; };
+const episodesOffered = () => { const kino = k(); return !!kino && typeof kino.apiVersion === "number" && kino.apiVersion >= EPISODES_API; };
 
 /** Whether the Contenido Home should be fetched now (a plugin with a ready Home installed and nothing fresh kept). */
 export function contentWanted(st) {

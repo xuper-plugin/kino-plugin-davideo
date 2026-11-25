@@ -3,7 +3,8 @@
 // notify). A newer one is looked up in the person's installed xuper-plugin plugins through the catalog door ("mine":
 // `search`, then `episodes` of the first plugin whose item is that series) and, when one lists that chapter, one bell notice
 // is posted whose tap plays it there (`go.episode`, Kino apiVersion 35). Every TMDB and door call counts against the job's
-// 10 requests a run. Nothing here throws out of runNewEpisodes.
+// 10 requests a run. Nothing here throws out of runNewEpisodes. Kino cuts a run at 20 s (runTimeoutMs): the state is saved after
+// every series and every notice, and no TMDB or door call starts past DEADLINE_MS, so a cut run never loses what it did.
 
 export const NEW_EP = { MAX_AGE_DAYS: 60, MAX_NOTICES: 5, RETRY_DAYS: 7, REQUESTS: 10 };
 
@@ -15,8 +16,12 @@ const DAY_MS = 86400000;
 const ALIAS = "mine";
 /** At most this many plugins' `episodes` asked for one series in one run. */
 export const EPISODES_PER_SERIES = 3;
-/** The longest item id Kino takes in go.episode. */
-export const MAX_GO_ID = 128;
+/** The item ids Kino takes in go.episode (its own check: any other id drops the whole go). */
+export const GO_ID = /^[A-Za-z0-9._~-]{1,128}$/;
+/** No TMDB or door call starts once the run is this old (Kino cuts it at 20 s; a slow provider spends the job's time). */
+export const DEADLINE_MS = 9000;
+/** What a run may write to kino.storage (the job's maxStorageWriteBytes, 256 KB, with room to spare): the state's saves. */
+export const STORAGE_BUDGET = 240 * 1024;
 
 /** Lower case, no accents, letters and digits only: how titles are compared. */
 const fold = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "");
@@ -24,6 +29,8 @@ const clip = (s, n) => { const t = String(s || "").trim(); return t.length > n ?
 const posInt = (v) => Number.isInteger(v) && v > 0;
 const nonNegInt = (v) => Number.isInteger(v) && v >= 0;
 const errCode = (e) => (e && typeof e.code === "string" ? e.code : "error");
+/** UTF-8 bytes of [s], as Kino counts a storage write. */
+const utf8Len = (s) => { let n = 0; for (let i = 0; i < s.length; i++) { const c = s.charCodeAt(i); n += c < 0x80 ? 1 : c < 0x800 ? 2 : c >= 0xd800 && c < 0xdc00 ? (i++, 4) : 3; } return n; };
 
 /** The state kept in kino.storage, always well formed. */
 export function readState(raw) {
@@ -125,9 +132,9 @@ export function noticeOf({ tmdb, title, season, episode, repo, ref, pluginName, 
  */
 function goEpisodeOf({ repo, ref, title, season, episode, item }) {
   const go = { origin: repo, ref, season, episode };
-  // Kino drops the whole go over an id longer than MAX_GO_ID: such an id is left out, never cut (a cut id keys another row).
+  // Kino drops the whole go over an id that fails GO_ID: such an id is left out, never cut or cleaned (it would key another row).
   const id = item && (typeof item.id === "string" || typeof item.id === "number") ? String(item.id) : "";
-  if (id && id.length <= MAX_GO_ID) go.id = id;
+  if (GO_ID.test(id)) go.id = id;
   const name = clip(item && typeof item.title === "string" && item.title.trim() ? item.title : title, 120);
   if (name) go.title = name;
   if (item && item.adult === true) go.adult = true;
@@ -196,7 +203,7 @@ export function nextAfter(seasons, floor, last) {
 export function bindDeps(kino) {
   const has = (o, f) => o && typeof o[f] === "function";
   return {
-    apiVersion: kino && typeof kino.pluginApiVersion === "number" ? kino.pluginApiVersion : 0,
+    apiVersion: kino && typeof kino.apiVersion === "number" ? kino.apiVersion : 0, // Kino's own, never kino.pluginApiVersion (Da-Video's 31)
     library: kino && has(kino.library, "watched") ? (opts) => kino.library.watched(opts) : null,
     tmdb: kino && typeof kino.tmdb === "function" ? (path, params) => kino.tmdb(path, params) : null,
     callAll: kino && has(kino.plugins, "callAll") ? (alias, call, arg, opts) => kino.plugins.callAll(alias, call, arg, opts) : null,
@@ -234,7 +241,9 @@ async function run(deps) {
   if (!deps.tmdb) return { skipped: "no_tmdb" };
   if (!deps.callAll || !deps.call) return { skipped: "no_federation" };
   if (!deps.storage) return { skipped: "no_storage" };
-  const now = typeof deps.now === "function" ? deps.now() : Date.now();
+  const clock = typeof deps.now === "function" ? () => deps.now() : () => Date.now();
+  const now = clock();
+  const late = () => clock() - now > DEADLINE_MS; // checked before every TMDB and door call
   const today = new Date(now).toISOString().slice(0, 10);
   const L = deps.limits && typeof deps.limits === "object" ? { ...NEW_EP, ...deps.limits } : NEW_EP; // a test seam; Kino never passes it
 
@@ -260,7 +269,10 @@ async function run(deps) {
   };
   // Drops a series' pending ids other than [keep] (a superseded episode: the person watched on, or TMDB moved).
   const dropPending = (key, keep) => { for (const k of Object.keys(state.pending)) if (k !== keep && k.startsWith(`ep-${key}-`)) { delete state.pending[k]; delete state.tried[k]; } };
-  const save = () => {
+  let written = 0; // bytes this run wrote to kino.storage
+  let lastSaved = null;
+  // [final]: the run's last save, always tried; a checkpoint keeps room for it and skips a write that changes nothing.
+  const save = (final = false) => {
     // Prune to the series still in the library, pending ids within RETRY_DAYS (the baseline is left alone: the check's own
     // expiry raises it), and the last MAX_NOTIFIED ids.
     const still = new Set((Array.isArray(watched) ? watched : []).filter((e) => e && e.ids && posInt(e.ids.tmdb)).map((e) => String(e.ids.tmdb)));
@@ -276,13 +288,19 @@ async function run(deps) {
     const baselines = {};
     for (const [k, v] of Object.entries(state.baselines)) if (still.has(k)) baselines[k] = v;
     const out = { cursor: list.length ? (state.cursor % list.length + (unfinished >= 0 ? unfinished : visited)) % list.length : 0, baselines, pending, tried, notified: state.notified.slice(-MAX_NOTIFIED) };
-    try { deps.storage.set(STORAGE_KEY, JSON.stringify(out)); } catch (_) { /* full storage: the next run repeats this one */ }
+    const text = JSON.stringify(out);
+    if (text === lastSaved) return;
+    const bytes = utf8Len(STORAGE_KEY) + utf8Len(text);
+    if (!final && written + 2 * bytes > STORAGE_BUDGET) return;
+    try { deps.storage.set(STORAGE_KEY, text); written += bytes; lastSaved = text; } catch (_) { /* full storage: the next run repeats this one */ }
   };
+  const checkpoint = () => save(false);
   const later = (i) => { if (unfinished < 0) unfinished = i; };
 
   // candidates() already rotated the list: index i counts from the cursor.
   for (let i = 0; i < list.length; i++) {
-    if (summary.posted >= L.MAX_NOTICES || requests >= L.REQUESTS) break;
+    if (i > 0) checkpoint(); // the series before is done: a run cut from here on keeps it
+    if (summary.posted >= L.MAX_NOTICES || requests >= L.REQUESTS || late()) break;
     const c = list[i];
     visited = i + 1;
     const key = String(c.tmdb);
@@ -302,7 +320,7 @@ async function run(deps) {
     const target = nextAfter(seasons, floor, last);
     if (!target) continue;
     if (target.season !== last.season) {
-      if (requests + 3 > L.REQUESTS) { later(i); break; } // season data + search + episodes do not fit: first next run
+      if (requests + 3 > L.REQUESTS || late()) { later(i); break; } // season data + search + episodes do not fit: first next run
       requests++;
       let season;
       try { season = await deps.tmdb(`/tv/${c.tmdb}/season/${target.season}`, {}); } catch (_) { season = null; }
@@ -314,7 +332,7 @@ async function run(deps) {
     if (notified.has(id)) { raise(key, last); delete state.pending[id]; delete state.tried[id]; continue; }
     if (!(id in state.pending)) state.pending[id] = now;
     if (now - state.pending[id] > L.RETRY_DAYS * DAY_MS) { raise(key, last); delete state.pending[id]; delete state.tried[id]; continue; } // nobody had it: dropped
-    if (requests + 2 > L.REQUESTS) { later(i); break; } // no room for search + episodes: this series goes first next run
+    if (requests + 2 > L.REQUESTS || late()) { later(i); break; } // no room (or time) for search + episodes: first next run
 
     requests++;
     let answers;
@@ -331,7 +349,9 @@ async function run(deps) {
     const start = listing.length ? (state.tried[id] || 0) % listing.length : 0;
     let hit = null;
     let asked = 0;
+    let outOfTime = false;
     while (asked < Math.min(EPISODES_PER_SERIES, listing.length) && requests < L.REQUESTS) {
+      if (late()) { outOfTime = true; break; }
       const { a, item } = listing[(start + asked) % listing.length];
       requests++;
       asked++;
@@ -340,13 +360,17 @@ async function run(deps) {
       const chapter = matchChapter(chapters, { season: target.season, episode: target.episode, absolute });
       if (chapter) { hit = { repo: a.repo, name: a.name || a.id || a.repo, ref: item.ref, item, chapter }; break; }
     }
-    if (!hit) { if (listing.length) state.tried[id] = (start + asked) % listing.length; continue; } // pending: asked again on its next turn
+    if (!hit) {
+      if (listing.length) state.tried[id] = (start + asked) % listing.length; // pending: asked again on its next turn
+      if (outOfTime) { later(i); break; }
+      continue;
+    }
     const notice = noticeOf({ tmdb: c.tmdb, title: c.title, season: target.season, episode: target.episode, repo: hit.repo, ref: hit.ref, pluginName: hit.name, chapter: hit.chapter, item: hit.item });
     try {
       await deps.notify(notice);
     } catch (e) {
       const code = errCode(e);
-      if (code === "permission_denied" || code === "not_allowed") { save(); return { ...summary, skipped: "notifications_denied" }; }
+      if (code === "permission_denied" || code === "not_allowed") { save(true); return { ...summary, skipped: "notifications_denied" }; }
       continue; // rate limited or refused this once: still pending, asked again on its next turn
     }
     summary.posted++;
@@ -354,7 +378,8 @@ async function run(deps) {
     state.notified.push(id);
     delete state.pending[id]; delete state.tried[id];
     raise(key, last); // one notice covers everything aired so far
+    checkpoint(); // posted: a run cut now never posts it again
   }
-  save();
+  save(true);
   return summary;
 }

@@ -97,7 +97,7 @@ Per run, within 10 requests *(call: round-robin over the watched series, a few p
    normal resolve/progress/library path (saved as the series' episode, never as a movie); if the plugin no longer lists it,
    Kino opens that plugin's series page instead (never an error screen). Allowed in a notification's `go` and from a screen
    node's tap. Kino's own catalog: ES+EN strings, contract.json, kino.d.ts, README, kit validator and shim, tests.
-3. Older Kinos: Da-Video feature-detects (`kino.pluginApiVersion >= 35`); below it the job does nothing and the screen does not
+3. Older Kinos: Da-Video feature-detects (`kino.apiVersion >= 35`, Kino's own; `kino.pluginApiVersion` is the plugin's declared 31); below it the job does nothing and the screen does not
    offer the switch. Da-Video's own `apiVersion` is raised only through `enhancements`, so it keeps installing on older Kinos.
 
 ### The tap
