@@ -38,9 +38,14 @@ export function readState(raw) {
   if (o.pending && typeof o.pending === "object") {
     for (const [k, v] of Object.entries(o.pending)) if (typeof v === "number" && Number.isFinite(v)) pending[k] = v;
   }
+  // tried[id]: where the next run starts among the plugins listing the series, for that pending episode (rotates them).
+  const tried = {};
+  if (o.tried && typeof o.tried === "object") {
+    for (const [k, v] of Object.entries(o.tried)) if (k in pending && nonNegInt(v)) tried[k] = v;
+  }
   const notified = Array.isArray(o.notified) ? o.notified.filter((x) => typeof x === "string") : [];
   const cursor = nonNegInt(o.cursor) ? o.cursor : 0;
-  return { cursor, baselines, pending, notified };
+  return { cursor, baselines, pending, tried, notified };
 }
 
 /**
@@ -237,21 +242,23 @@ async function run(deps) {
     if (ep && (!state.baselines[key] || isNewer(ep, state.baselines[key]))) state.baselines[key] = { season: ep.season, episode: ep.episode };
   };
   // Drops a series' pending ids other than [keep] (a superseded episode: the person watched on, or TMDB moved).
-  const dropPending = (key, keep) => { for (const k of Object.keys(state.pending)) if (k !== keep && k.startsWith(`ep-${key}-`)) delete state.pending[k]; };
+  const dropPending = (key, keep) => { for (const k of Object.keys(state.pending)) if (k !== keep && k.startsWith(`ep-${key}-`)) { delete state.pending[k]; delete state.tried[k]; } };
   const save = () => {
-    // Prune to the series still in the library, pending ids within RETRY_DAYS, and the last MAX_NOTIFIED ids. A pending id
-    // that outlived its window is dropped as the check would: its baseline moves up to it, so its timer never restarts.
+    // Prune to the series still in the library, pending ids within RETRY_DAYS (the baseline is left alone: the check's own
+    // expiry raises it), and the last MAX_NOTIFIED ids.
     const still = new Set((Array.isArray(watched) ? watched : []).filter((e) => e && e.ids && posInt(e.ids.tmdb)).map((e) => String(e.ids.tmdb)));
     const pending = {};
     for (const [k, v] of Object.entries(state.pending)) {
       const p = seriesOf(k);
       if (!p || !still.has(p.key)) continue;
-      if (now - v > L.RETRY_DAYS * DAY_MS) { raise(p.key, p); continue; }
+      if (now - v > L.RETRY_DAYS * DAY_MS) continue;
       pending[k] = v;
     }
+    const tried = {};
+    for (const [k, v] of Object.entries(state.tried)) if (k in pending) tried[k] = v;
     const baselines = {};
     for (const [k, v] of Object.entries(state.baselines)) if (still.has(k)) baselines[k] = v;
-    const out = { cursor: list.length ? (state.cursor % list.length + (unfinished >= 0 ? unfinished : visited)) % list.length : 0, baselines, pending, notified: state.notified.slice(-MAX_NOTIFIED) };
+    const out = { cursor: list.length ? (state.cursor % list.length + (unfinished >= 0 ? unfinished : visited)) % list.length : 0, baselines, pending, tried, notified: state.notified.slice(-MAX_NOTIFIED) };
     try { deps.storage.set(STORAGE_KEY, JSON.stringify(out)); } catch (_) { /* full storage: the next run repeats this one */ }
   };
   const later = (i) => { if (unfinished < 0) unfinished = i; };
@@ -287,23 +294,28 @@ async function run(deps) {
     }
     const id = `ep-${c.tmdb}-s${target.season}e${target.episode}`;
     dropPending(key, id);
-    if (notified.has(id)) { raise(key, last); delete state.pending[id]; continue; }
+    if (notified.has(id)) { raise(key, last); delete state.pending[id]; delete state.tried[id]; continue; }
     if (!(id in state.pending)) state.pending[id] = now;
-    if (now - state.pending[id] > L.RETRY_DAYS * DAY_MS) { raise(key, last); delete state.pending[id]; continue; } // nobody had it: dropped
+    if (now - state.pending[id] > L.RETRY_DAYS * DAY_MS) { raise(key, last); delete state.pending[id]; delete state.tried[id]; continue; } // nobody had it: dropped
     if (requests + 2 > L.REQUESTS) { later(i); break; } // no room for search + episodes: this series goes first next run
 
     requests++;
     let answers;
     try { answers = await deps.callAll(ALIAS, "search", { q: c.title, type: "series", tmdb: c.tmdb }); } catch (_) { answers = []; }
     const absolute = absoluteNumber(seasons, target.season, target.episode);
-    let hit = null;
-    let asked = 0;
+    // The plugins that list the series, in Kino's order; a pending episode goes on from where the last run stopped, so every
+    // one of them is asked within a few runs, EPISODES_PER_SERIES a run at most (then the other series have their turn).
+    const listing = [];
     for (const a of Array.isArray(answers) ? answers : []) {
-      // A series gets at most EPISODES_PER_SERIES door calls a run, then the others have their turn.
-      if (asked >= EPISODES_PER_SERIES || requests >= L.REQUESTS) break;
       if (!a || !a.ok || typeof a.repo !== "string") continue;
       const item = pickItem(a.value, c);
-      if (!item) continue;
+      if (item) listing.push({ a, item });
+    }
+    const start = listing.length ? (state.tried[id] || 0) % listing.length : 0;
+    let hit = null;
+    let asked = 0;
+    while (asked < Math.min(EPISODES_PER_SERIES, listing.length) && requests < L.REQUESTS) {
+      const { a, item } = listing[(start + asked) % listing.length];
       requests++;
       asked++;
       let chapters;
@@ -311,7 +323,7 @@ async function run(deps) {
       const chapter = matchChapter(chapters, { season: target.season, episode: target.episode, absolute });
       if (chapter) { hit = { repo: a.repo, name: a.name || a.id || a.repo, ref: item.ref, chapter }; break; }
     }
-    if (!hit) continue; // pending: asked again when its turn comes round
+    if (!hit) { if (listing.length) state.tried[id] = (start + asked) % listing.length; continue; } // pending: asked again on its next turn
     const notice = noticeOf({ tmdb: c.tmdb, title: c.title, season: target.season, episode: target.episode, repo: hit.repo, ref: hit.ref, pluginName: hit.name, chapter: hit.chapter });
     try {
       await deps.notify(notice);
@@ -323,7 +335,7 @@ async function run(deps) {
     summary.posted++;
     notified.add(id);
     state.notified.push(id);
-    delete state.pending[id];
+    delete state.pending[id]; delete state.tried[id];
     raise(key, last); // one notice covers everything aired so far
   }
   save();

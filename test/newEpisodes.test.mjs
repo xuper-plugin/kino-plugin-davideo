@@ -449,11 +449,13 @@ test("a whole season released at once notifies its first unwatched episode, not 
 });
 
 test("pending entries are pruned after 7 days", async () => {
-  // The series' TMDB answer fails this run: its expired pending id is pruned anyway (and dropped: the baseline moves up).
-  const k1 = fakeKino({ tmdb: {}, state: { cursor: 0, baselines: { 136315: { season: 3, episode: 4 } }, pending: { "ep-136315-s3e5": NOW - 8 * DAY }, notified: [] } });
+  // The series' TMDB answer fails this run: its expired pending id (and its rotation) is pruned anyway; the baseline is left
+  // alone (the check's own expiry is what raises it).
+  const k1 = fakeKino({ tmdb: {}, state: { cursor: 0, baselines: { 136315: { season: 3, episode: 4 } }, pending: { "ep-136315-s3e5": NOW - 8 * DAY }, tried: { "ep-136315-s3e5": 2 }, notified: [] } });
   await runNewEpisodes({}, deps(k1));
   assert.deepEqual(stateOf(k1).pending, {});
-  assert.deepEqual(stateOf(k1).baselines["136315"], { season: 3, episode: 5 });
+  assert.deepEqual(stateOf(k1).tried, {});
+  assert.deepEqual(stateOf(k1).baselines["136315"], { season: 3, episode: 4 });
   // A superseded episode's pending id goes when the series is checked.
   const k2 = fakeKino({
     tmdb: { 136315: tv(3, 5) },
@@ -481,4 +483,47 @@ test("an absolute-numbered played episode is not re-notified", async () => {
   const out = await runNewEpisodes({}, deps(unknown));
   assert.equal(out.posted, 1);
   assert.equal(unknown.notices[0].id, "ep-209867-s2e2");
+});
+
+// Fix round 2 (re-review).
+
+test("a plugin beyond the first three is asked on a later run", async () => {
+  const repos = [1, 2, 3, 4, 5].map((n) => `xuper-plugin/kino-plugin-p${n}`);
+  const search = {};
+  const episodes = {};
+  for (const r of repos) {
+    search[r] = [{ id: "b", ref: `${r}:bear`, title: "The Bear", kind: "series", tmdb: 136315 }];
+    episodes[r] = { [`${r}:bear`]: r.endsWith("p5") ? bearEps(5) : bearEps(4) };
+  }
+  const opts = { tmdb: { 136315: tv(3, 5) }, search, episodes };
+  const k1 = fakeKino({ ...opts, state: seen({ 136315: { season: 3, episode: 4 } }) });
+  assert.equal((await runNewEpisodes({}, deps(k1))).posted, 0);
+  assert.deepEqual(k1.calls.filter((c) => c[2] === "episodes").map((c) => c[4].only[0]), repos.slice(0, 3));
+  assert.equal(stateOf(k1).tried["ep-136315-s3e5"], 3);
+  const k2 = fakeKino({ ...opts, state: stateOf(k1) });
+  const out = await runNewEpisodes({}, deps(k2, NOW + DAY));
+  assert.equal(out.posted, 1);
+  assert.deepEqual(k2.calls.filter((c) => c[2] === "episodes").map((c) => c[4].only[0]), repos.slice(3, 5), "goes on from the fourth");
+  assert.equal(k2.notices[0].go.episode.origin, repos[4]);
+  assert.equal(k2.notices[0].id, "ep-136315-s3e5");
+  assert.deepEqual(stateOf(k2).pending, {});
+  assert.deepEqual(stateOf(k2).tried, {});
+  // The rotation wraps round: after the last plugin the first is asked again.
+  const k3 = fakeKino({ ...opts, episodes: { ...episodes, [repos[4]]: { [`${repos[4]}:bear`]: bearEps(4) } }, state: stateOf(k1) });
+  await runNewEpisodes({}, deps(k3, NOW + DAY));
+  assert.deepEqual(k3.calls.filter((c) => c[2] === "episodes").map((c) => c[4].only[0]), [repos[3], repos[4], repos[0]]);
+  assert.equal(stateOf(k3).tried["ep-136315-s3e5"], 1);
+});
+
+test("the check's own expiry still raises the baseline to the last aired episode", async () => {
+  const kino = fakeKino({
+    tmdb: { 136315: tv(3, 6) },
+    state: { cursor: 0, baselines: { 136315: { season: 3, episode: 4 } }, pending: { "ep-136315-s3e5": NOW - 8 * DAY }, tried: { "ep-136315-s3e5": 1 }, notified: [] },
+    search: bearSearch,
+  });
+  await runNewEpisodes({}, deps(kino));
+  assert.deepEqual(stateOf(kino).baselines["136315"], { season: 3, episode: 6 });
+  assert.deepEqual(stateOf(kino).pending, {});
+  assert.deepEqual(stateOf(kino).tried, {});
+  assert.equal(kino.calls.some((c) => c[0] === "callAll"), false);
 });
