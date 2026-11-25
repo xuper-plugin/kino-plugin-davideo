@@ -39,6 +39,16 @@ export function jobIsOn() {
   try { return typeof kino.jobOn === "function" ? !!kino.jobOn("update") : null; } catch { return null; }
 }
 
+/** Whether Kino's own row of the new-episodes job is on; null when this Kino cannot say. */
+export function episodesJobIsOn() {
+  const kino = k();
+  try { return typeof kino.jobOn === "function" ? !!kino.jobOn("episodes") : null; } catch { return null; }
+}
+
+/** The new-episodes job needs Kino's apiVersion 35 (kino.plugins and the episode notice in a job). */
+const EPISODES_API = 35;
+const episodesOffered = () => { const kino = k(); return !!kino && typeof kino.pluginApiVersion === "number" && kino.pluginApiVersion >= EPISODES_API; };
+
 /** Whether the Contenido Home should be fetched now (a plugin with a ready Home installed and nothing fresh kept). */
 export function contentWanted(st) {
   const plugins = contentPlugins(st);
@@ -47,7 +57,7 @@ export function contentWanted(st) {
 
 /** The last status read: the tab events know which plugins the Contenido Home is made of. */
 let lastStatus = null;
-const statusState = (st) => { lastStatus = st; return { mp: st, jobOn: jobIsOn(), busy: st.running }; };
+const statusState = (st) => { lastStatus = st; return { mp: st, jobOn: jobIsOn(), episodesOn: episodesJobIsOn(), busy: st.running }; };
 
 /** The tab shown: Contenido when a plugin with a ready Home is installed, unless the person picked Mis plugins. */
 const tabOf = (state, st) => (contentPlugins(st).length > 0 && !(state && state.dvTab === "mine") ? "content" : "mine");
@@ -105,6 +115,10 @@ export const PAGE_EVENTS = {
   },
   enableAuto() {
     return { enableJob: "update", state: { jobOn: true } };
+  },
+  // The new-episodes job, off until the person's tap too.
+  enableEpisodes() {
+    return { enableJob: "episodes", state: { episodesOn: true } };
   },
   async checkNow() {
     return startPass(null);
@@ -266,6 +280,18 @@ export function pageView({ state }) {
       text("autoOffText", "Actívalas y Da-Video mantendrá al día tus plugins cada 4 horas, sin preguntarte cada vez.",
         "Turn them on and Da-Video keeps your plugins up to date every 4 hours, without asking each time.", { color: "muted" }),
       { type: "ElevatedButton", key: "enableAuto", icon: "sync", ...label("Activar", "Turn on"), onPressed: { event: "enableAuto" } },
+    ] }] });
+  }
+  // New-episode notices (Kino 35+): the line, with a one-tap Activar while Kino's row of the job is off.
+  if (episodesOffered()) {
+    const off = state.episodesOn === false;
+    const unknown = state.episodesOn !== true && state.episodesOn !== false;
+    nodes.push({ type: "Card", key: "episodesCard", children: [{ type: "Column", padding: 12, gap: 8, children: [
+      text("episodesTitle", "Avísame de capítulos nuevos", "Tell me about new episodes", { style: "h5" }),
+      text("episodesHint", "Te aviso cuando sale un capítulo nuevo de una serie que ves y ya está en uno de tus plugins.",
+        "I'll tell you when a new episode of a series you watch is out and already on one of your plugins.", { color: "muted" }),
+      ...(off ? [{ type: "ElevatedButton", key: "enableEpisodes", icon: "notifications", ...label("Activar", "Turn on"), onPressed: { event: "enableEpisodes" } }] : []),
+      ...(unknown ? [text("episodesWhere", "Actívalo en Ajustes ▸ Plugins ▸ Da-Video.", "Turn it on in Settings ▸ Plugins ▸ Da-Video.", { style: "caption", color: "muted" })] : []),
     ] }] });
   }
   // The heart (Kino Resolver) is one more plugin, first of its group.

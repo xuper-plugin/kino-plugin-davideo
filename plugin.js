@@ -1104,6 +1104,19 @@ function jobIsOn() {
     return null;
   }
 }
+function episodesJobIsOn() {
+  const kino = k2();
+  try {
+    return typeof kino.jobOn === "function" ? !!kino.jobOn("episodes") : null;
+  } catch {
+    return null;
+  }
+}
+var EPISODES_API = 35;
+var episodesOffered = () => {
+  const kino = k2();
+  return !!kino && typeof kino.pluginApiVersion === "number" && kino.pluginApiVersion >= EPISODES_API;
+};
 function contentWanted(st) {
   const plugins = contentPlugins(st);
   return plugins.length > 0 && contentStale(plugins.map((x) => x.repo));
@@ -1111,7 +1124,7 @@ function contentWanted(st) {
 var lastStatus = null;
 var statusState = (st) => {
   lastStatus = st;
-  return { mp: st, jobOn: jobIsOn(), busy: st.running };
+  return { mp: st, jobOn: jobIsOn(), episodesOn: episodesJobIsOn(), busy: st.running };
 };
 var tabOf2 = (state, st) => contentPlugins(st).length > 0 && !(state && state.dvTab === "mine") ? "content" : "mine";
 function pageActions({ state }) {
@@ -1166,6 +1179,10 @@ var PAGE_EVENTS = {
   },
   enableAuto() {
     return { enableJob: "update", state: { jobOn: true } };
+  },
+  // The new-episodes job, off until the person's tap too.
+  enableEpisodes() {
+    return { enableJob: "episodes", state: { episodesOn: true } };
   },
   async checkNow() {
     return startPass(null);
@@ -1331,6 +1348,21 @@ function pageView({ state }) {
       { type: "ElevatedButton", key: "enableAuto", icon: "sync", ...label("Activar", "Turn on"), onPressed: { event: "enableAuto" } }
     ] }] });
   }
+  if (episodesOffered()) {
+    const off = state.episodesOn === false;
+    const unknown = state.episodesOn !== true && state.episodesOn !== false;
+    nodes.push({ type: "Card", key: "episodesCard", children: [{ type: "Column", padding: 12, gap: 8, children: [
+      text("episodesTitle", "Avísame de capítulos nuevos", "Tell me about new episodes", { style: "h5" }),
+      text(
+        "episodesHint",
+        "Te aviso cuando sale un capítulo nuevo de una serie que ves y ya está en uno de tus plugins.",
+        "I'll tell you when a new episode of a series you watch is out and already on one of your plugins.",
+        { color: "muted" }
+      ),
+      ...off ? [{ type: "ElevatedButton", key: "enableEpisodes", icon: "notifications", ...label("Activar", "Turn on"), onPressed: { event: "enableEpisodes" } }] : [],
+      ...unknown ? [text("episodesWhere", "Actívalo en Ajustes ▸ Plugins ▸ Da-Video.", "Turn it on in Settings ▸ Plugins ▸ Da-Video.", { style: "caption", color: "muted" })] : []
+    ] }] });
+  }
   const all = [RESOLVER, ...PLUGINS];
   const installed = all.filter((p) => st.plugins[p.repo]);
   const missing = all.filter((p) => !st.plugins[p.repo]);
@@ -1358,6 +1390,351 @@ function pageView({ state }) {
   return [{ type: "Column", key: "dvPage", crossAxisAlignment: "stretch", padding: { compact: 16, expanded: 24 }, gap: 16, children: nodes }];
 }
 var pageEvery = ({ state }) => state && state.contentLoading ? { ms: 1e3, event: "contentLoad" } : { ms: state && (state.busy || state.pick) ? POLL_MS2 : IDLE_POLL_MS, event: "refresh" };
+
+// src/newEpisodes.js
+var NEW_EP = { MAX_AGE_DAYS: 60, MAX_NOTICES: 5, RETRY_DAYS: 7, REQUESTS: 10 };
+var MIN_API = 35;
+var STORAGE_KEY = "newEpisodes";
+var MAX_NOTIFIED = 500;
+var DAY_MS = 864e5;
+var ALIAS = "mine";
+var EPISODES_PER_SERIES = 3;
+var fold = (s) => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+var clip2 = (s, n) => {
+  const t = String(s || "").trim();
+  return t.length > n ? t.slice(0, n - 1) + "…" : t;
+};
+var posInt = (v) => Number.isInteger(v) && v > 0;
+var nonNegInt = (v) => Number.isInteger(v) && v >= 0;
+var errCode = (e) => e && typeof e.code === "string" ? e.code : "error";
+function readState(raw) {
+  let o = null;
+  try {
+    o = typeof raw === "string" ? JSON.parse(raw) : raw;
+  } catch (_) {
+    o = null;
+  }
+  if (!o || typeof o !== "object") o = {};
+  const baselines = {};
+  if (o.baselines && typeof o.baselines === "object") {
+    for (const [k3, v] of Object.entries(o.baselines)) {
+      if (v && nonNegInt(v.season) && nonNegInt(v.episode)) baselines[k3] = { season: v.season, episode: v.episode };
+    }
+  }
+  const pending = {};
+  if (o.pending && typeof o.pending === "object") {
+    for (const [k3, v] of Object.entries(o.pending)) if (typeof v === "number" && Number.isFinite(v)) pending[k3] = v;
+  }
+  const tried = {};
+  if (o.tried && typeof o.tried === "object") {
+    for (const [k3, v] of Object.entries(o.tried)) if (k3 in pending && nonNegInt(v)) tried[k3] = v;
+  }
+  const notified = Array.isArray(o.notified) ? o.notified.filter((x) => typeof x === "string") : [];
+  const cursor = nonNegInt(o.cursor) ? o.cursor : 0;
+  return { cursor, baselines, pending, tried, notified };
+}
+function candidates(watched, state, nowMs) {
+  const out = [];
+  const seen = /* @__PURE__ */ new Set();
+  const oldest = nowMs - NEW_EP.MAX_AGE_DAYS * DAY_MS;
+  for (const e of Array.isArray(watched) ? watched : []) {
+    if (!e || e.kind !== "series" || !e.ids || !posInt(e.ids.tmdb) || seen.has(e.ids.tmdb)) continue;
+    if (typeof e.watchedAtMs !== "number" || e.watchedAtMs < oldest) continue;
+    seen.add(e.ids.tmdb);
+    const c = { tmdb: e.ids.tmdb, title: String(e.title || "") };
+    if (nonNegInt(e.season) && posInt(e.episode)) {
+      c.season = e.season;
+      c.episode = e.episode;
+    }
+    out.push(c);
+  }
+  if (!out.length) return out;
+  const start = (state && nonNegInt(state.cursor) ? state.cursor : 0) % out.length;
+  return out.slice(start).concat(out.slice(0, start));
+}
+function isNewer(aired, seen) {
+  if (!aired) return false;
+  if (!seen) return true;
+  return aired.season > seen.season || aired.season === seen.season && aired.episode > seen.episode;
+}
+function absoluteNumber(seasons, season, episode) {
+  let n = episode;
+  for (const s of Array.isArray(seasons) ? seasons : []) {
+    if (s && posInt(s.season_number) && s.season_number < season && nonNegInt(s.episode_count)) n += s.episode_count;
+  }
+  return n;
+}
+function matchChapter(chapters, { season, episode, absolute }) {
+  const list = (Array.isArray(chapters) ? chapters : []).filter((c) => c && typeof c.ref === "string" && Number.isInteger(c.number));
+  const exact = list.find((c) => c.season === season && c.number === episode);
+  if (exact) return exact;
+  const seasons = new Set(list.map((c) => c.season));
+  if (seasons.size === 1 && posInt(absolute)) return list.find((c) => c.number === absolute) || null;
+  return null;
+}
+function noticeOf2({ tmdb, title, season, episode, repo, ref, pluginName, chapter }) {
+  const name = clip2(title, 60);
+  const plugin = clip2(pluginName, 60);
+  const goSeason = chapter && Number.isInteger(chapter.season) ? chapter.season : season;
+  const goEpisode = chapter && Number.isInteger(chapter.number) ? chapter.number : episode;
+  return {
+    id: `ep-${tmdb}-s${season}e${episode}`,
+    title: `Nuevo capítulo de ${name}`,
+    titleEn: `New episode of ${name}`,
+    text: `T${season}·E${episode} ya está en ${plugin}`,
+    textEn: `S${season}·E${episode} is now on ${plugin}`,
+    go: { episode: { origin: repo, ref, season: goSeason, episode: goEpisode } }
+  };
+}
+var itemTmdb = (it) => posInt(it.tmdb) ? it.tmdb : it.ids && posInt(it.ids.tmdb) ? it.ids.tmdb : 0;
+function pickItem(items, { tmdb, title }) {
+  const list = (Array.isArray(items) ? items : []).filter((it) => it && typeof it.ref === "string" && (!it.kind || it.kind === "series"));
+  const byId = list.find((it) => itemTmdb(it) === tmdb);
+  if (byId) return byId;
+  const want = fold(title);
+  return want && list.find((it) => itemTmdb(it) === 0 && fold(it.title) === want) || null;
+}
+function airedOf(e, today) {
+  if (!e || !posInt(e.season_number) || !posInt(e.episode_number)) return null;
+  if (typeof e.air_date === "string" && e.air_date && e.air_date > today) return null;
+  return { season: e.season_number, episode: e.episode_number };
+}
+var seasonCounts = (seasons) => (Array.isArray(seasons) ? seasons : []).filter((s) => s && posInt(s.season_number) && nonNegInt(s.episode_count)).map((s) => ({ season: s.season_number, count: s.episode_count })).sort((a, b) => a.season - b.season);
+function fromAbsolute(seasons, n) {
+  let left = n;
+  for (const s of seasonCounts(seasons)) {
+    if (left <= s.count) return { season: s.season, episode: left };
+    left -= s.count;
+  }
+  return null;
+}
+function playedOf(c, seasons) {
+  if (!c || !posInt(c.season) || !posInt(c.episode)) return null;
+  if (c.season !== 1) return { season: c.season, episode: c.episode };
+  const first = seasonCounts(seasons).find((s) => s.season === 1);
+  if (!first || c.episode <= first.count) return { season: 1, episode: c.episode };
+  return fromAbsolute(seasons, c.episode);
+}
+function nextAfter(seasons, floor, last) {
+  if (floor.season === last.season) return { season: floor.season, episode: floor.episode + 1 };
+  const counts = seasonCounts(seasons);
+  const cur = counts.find((s) => s.season === floor.season);
+  if (cur && floor.episode < cur.count) return { season: floor.season, episode: floor.episode + 1 };
+  const next = counts.find((s) => s.season > floor.season);
+  if (next) return { season: next.season, episode: 1 };
+  return floor.season < last.season ? { season: last.season, episode: 1 } : null;
+}
+function bindDeps(kino) {
+  const has = (o, f) => o && typeof o[f] === "function";
+  return {
+    apiVersion: kino && typeof kino.pluginApiVersion === "number" ? kino.pluginApiVersion : 0,
+    library: kino && has(kino.library, "watched") ? (opts) => kino.library.watched(opts) : null,
+    tmdb: kino && typeof kino.tmdb === "function" ? (path, params) => kino.tmdb(path, params) : null,
+    callAll: kino && has(kino.plugins, "callAll") ? (alias, call, arg, opts) => kino.plugins.callAll(alias, call, arg, opts) : null,
+    // An author entry names many repos: one plugin is asked through callAll's `only` (still one request).
+    call: kino && has(kino.plugins, "callAll") ? async (repo, call, arg) => {
+      const answers = await kino.plugins.callAll(ALIAS, call, arg, { only: [repo] });
+      const a = (Array.isArray(answers) ? answers : []).find((x) => x && x.repo === repo);
+      if (!a || !a.ok) {
+        const e = new Error(`${call}: ${a && a.code || "provider_missing"}`);
+        e.code = a && a.code || "provider_missing";
+        throw e;
+      }
+      return a.value;
+    } : null,
+    notify: kino && has(kino.notifications, "post") ? (n) => kino.notifications.post(n) : null,
+    storage: kino && kino.storage ? kino.storage : null,
+    now: () => Date.now()
+  };
+}
+var defaultDeps = new Proxy({}, { get: (_, key) => bindDeps(globalThis.kino)[key] });
+async function runNewEpisodes(ctx, deps = defaultDeps) {
+  try {
+    return await run(deps);
+  } catch (e) {
+    return { checked: 0, posted: 0, skipped: `error:${errCode(e)}` };
+  }
+}
+async function run(deps) {
+  if (!(typeof deps.apiVersion === "number" && deps.apiVersion >= MIN_API)) return { skipped: "kino_too_old" };
+  if (!deps.library) return { skipped: "library_denied" };
+  if (!deps.notify) return { skipped: "notifications_denied" };
+  if (!deps.tmdb) return { skipped: "no_tmdb" };
+  if (!deps.callAll || !deps.call) return { skipped: "no_federation" };
+  if (!deps.storage) return { skipped: "no_storage" };
+  const now = typeof deps.now === "function" ? deps.now() : Date.now();
+  const today = new Date(now).toISOString().slice(0, 10);
+  const L = deps.limits && typeof deps.limits === "object" ? { ...NEW_EP, ...deps.limits } : NEW_EP;
+  let watched;
+  try {
+    watched = await deps.library({ kind: "series", limit: 100 });
+  } catch (e) {
+    const c = errCode(e);
+    return { skipped: c === "permission_denied" || c === "not_allowed" ? "library_denied" : "library_failed" };
+  }
+  const state = readState(deps.storage.get(STORAGE_KEY));
+  const list = candidates(watched, state, now);
+  const notified = new Set(state.notified);
+  const summary = { checked: 0, posted: 0 };
+  let requests = 0;
+  let visited = 0;
+  let unfinished = -1;
+  const seriesOf = (id) => {
+    const m = /^ep-(\d+)-s(\d+)e(\d+)$/.exec(id);
+    return m ? { key: m[1], season: +m[2], episode: +m[3] } : null;
+  };
+  const raise = (key, ep) => {
+    if (ep && (!state.baselines[key] || isNewer(ep, state.baselines[key]))) state.baselines[key] = { season: ep.season, episode: ep.episode };
+  };
+  const dropPending = (key, keep) => {
+    for (const k3 of Object.keys(state.pending)) if (k3 !== keep && k3.startsWith(`ep-${key}-`)) {
+      delete state.pending[k3];
+      delete state.tried[k3];
+    }
+  };
+  const save = () => {
+    const still = new Set((Array.isArray(watched) ? watched : []).filter((e) => e && e.ids && posInt(e.ids.tmdb)).map((e) => String(e.ids.tmdb)));
+    const pending = {};
+    for (const [k3, v] of Object.entries(state.pending)) {
+      const p = seriesOf(k3);
+      if (!p || !still.has(p.key)) continue;
+      if (now - v > L.RETRY_DAYS * DAY_MS) continue;
+      pending[k3] = v;
+    }
+    const tried = {};
+    for (const [k3, v] of Object.entries(state.tried)) if (k3 in pending) tried[k3] = v;
+    const baselines = {};
+    for (const [k3, v] of Object.entries(state.baselines)) if (still.has(k3)) baselines[k3] = v;
+    const out = { cursor: list.length ? (state.cursor % list.length + (unfinished >= 0 ? unfinished : visited)) % list.length : 0, baselines, pending, tried, notified: state.notified.slice(-MAX_NOTIFIED) };
+    try {
+      deps.storage.set(STORAGE_KEY, JSON.stringify(out));
+    } catch (_) {
+    }
+  };
+  const later = (i) => {
+    if (unfinished < 0) unfinished = i;
+  };
+  for (let i = 0; i < list.length; i++) {
+    if (summary.posted >= L.MAX_NOTICES || requests >= L.REQUESTS) break;
+    const c = list[i];
+    visited = i + 1;
+    const key = String(c.tmdb);
+    requests++;
+    let body;
+    try {
+      body = await deps.tmdb(`/tv/${c.tmdb}`, {});
+    } catch (_) {
+      body = null;
+    }
+    summary.checked++;
+    const last = airedOf(body && body.last_episode_to_air, today);
+    if (!last) continue;
+    if (!state.baselines[key]) {
+      raise(key, last);
+      continue;
+    }
+    const seasons = body.seasons;
+    const played = playedOf(c, seasons);
+    const floor = played && isNewer(played, state.baselines[key]) ? played : state.baselines[key];
+    if (!isNewer(last, floor)) {
+      raise(key, last);
+      dropPending(key, null);
+      continue;
+    }
+    const target = nextAfter(seasons, floor, last);
+    if (!target) continue;
+    if (target.season !== last.season) {
+      if (requests + 3 > L.REQUESTS) {
+        later(i);
+        break;
+      }
+      requests++;
+      let season;
+      try {
+        season = await deps.tmdb(`/tv/${c.tmdb}/season/${target.season}`, {});
+      } catch (_) {
+        season = null;
+      }
+      const ep = season && Array.isArray(season.episodes) ? season.episodes.find((e) => e && e.episode_number === target.episode) : null;
+      if (!ep || typeof ep.air_date !== "string" || !ep.air_date || ep.air_date > today) continue;
+    }
+    const id = `ep-${c.tmdb}-s${target.season}e${target.episode}`;
+    dropPending(key, id);
+    if (notified.has(id)) {
+      raise(key, last);
+      delete state.pending[id];
+      delete state.tried[id];
+      continue;
+    }
+    if (!(id in state.pending)) state.pending[id] = now;
+    if (now - state.pending[id] > L.RETRY_DAYS * DAY_MS) {
+      raise(key, last);
+      delete state.pending[id];
+      delete state.tried[id];
+      continue;
+    }
+    if (requests + 2 > L.REQUESTS) {
+      later(i);
+      break;
+    }
+    requests++;
+    let answers;
+    try {
+      answers = await deps.callAll(ALIAS, "search", { q: c.title, type: "series", tmdb: c.tmdb });
+    } catch (_) {
+      answers = [];
+    }
+    const absolute = absoluteNumber(seasons, target.season, target.episode);
+    const listing = [];
+    for (const a of Array.isArray(answers) ? answers : []) {
+      if (!a || !a.ok || typeof a.repo !== "string") continue;
+      const item = pickItem(a.value, c);
+      if (item) listing.push({ a, item });
+    }
+    const start = listing.length ? (state.tried[id] || 0) % listing.length : 0;
+    let hit = null;
+    let asked = 0;
+    while (asked < Math.min(EPISODES_PER_SERIES, listing.length) && requests < L.REQUESTS) {
+      const { a, item } = listing[(start + asked) % listing.length];
+      requests++;
+      asked++;
+      let chapters;
+      try {
+        chapters = await deps.call(a.repo, "episodes", { ref: item.ref });
+      } catch (_) {
+        continue;
+      }
+      const chapter = matchChapter(chapters, { season: target.season, episode: target.episode, absolute });
+      if (chapter) {
+        hit = { repo: a.repo, name: a.name || a.id || a.repo, ref: item.ref, chapter };
+        break;
+      }
+    }
+    if (!hit) {
+      if (listing.length) state.tried[id] = (start + asked) % listing.length;
+      continue;
+    }
+    const notice = noticeOf2({ tmdb: c.tmdb, title: c.title, season: target.season, episode: target.episode, repo: hit.repo, ref: hit.ref, pluginName: hit.name, chapter: hit.chapter });
+    try {
+      await deps.notify(notice);
+    } catch (e) {
+      const code = errCode(e);
+      if (code === "permission_denied" || code === "not_allowed") {
+        save();
+        return { ...summary, skipped: "notifications_denied" };
+      }
+      continue;
+    }
+    summary.posted++;
+    notified.add(id);
+    state.notified.push(id);
+    delete state.pending[id];
+    delete state.tried[id];
+    raise(key, last);
+  }
+  save();
+  return summary;
+}
 
 // src/plugin.js
 var MINE = "mine";
@@ -1395,7 +1772,7 @@ var standard = () => std ?? (std = makeStandardScreen({
     open: async () => {
       await refreshCatalog();
       const mp = await loadStatus();
-      return { mp, jobOn: jobIsOn(), busy: mp.running, notice: null, contentLoading: contentWanted(mp) };
+      return { mp, jobOn: jobIsOn(), episodesOn: episodesJobIsOn(), busy: mp.running, notice: null, contentLoading: contentWanted(mp) };
     },
     view: pageView,
     actions: pageActions,
@@ -1415,6 +1792,7 @@ async function screenEvent(ev) {
 }
 async function job(ctx) {
   await null;
+  if (ctx && ctx.id === "episodes") return runNewEpisodes(ctx);
   if (!ctx || ctx.id !== "update") return null;
   const kino = globalThis.kino;
   if (!kino || typeof kino.manage !== "object") return null;

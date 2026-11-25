@@ -6,7 +6,8 @@
 import { makeStandardScreen } from "./std/index.js";
 import { LOGO, LOGO_ASPECT } from "./logo.js";
 import { PLUGINS, SEARCH_FIRST, useKeptCatalog, refreshCatalog } from "./catalog.js";
-import { loadStatus, pageView, pageEvery, pageActions, PAGE_EVENTS, jobIsOn, contentWanted } from "./page.js";
+import { loadStatus, pageView, pageEvery, pageActions, PAGE_EVENTS, jobIsOn, episodesJobIsOn, contentWanted } from "./page.js";
+import { runNewEpisodes } from "./newEpisodes.js";
 
 /** The consumes entry by author (kino-plugin.json): every installed xuper-plugin plugin that opens the catalog door. */
 const MINE = "mine";
@@ -46,7 +47,7 @@ const standard = () => (std ??= makeStandardScreen({
       await refreshCatalog();
       const mp = await loadStatus();
       // The Contenido Home is fetched behind the first drawing (the page's timer) when nothing fresh is kept.
-      return { mp, jobOn: jobIsOn(), busy: mp.running, notice: null, contentLoading: contentWanted(mp) };
+      return { mp, jobOn: jobIsOn(), episodesOn: episodesJobIsOn(), busy: mp.running, notice: null, contentLoading: contentWanted(mp) };
     },
     view: pageView,
     actions: pageActions,
@@ -67,9 +68,13 @@ export async function screenEvent(ev) {
   return standard().screenEvent(ev && typeof ev === "object" ? ev : {});
 }
 
-/** The scheduled job: one pass over the person's xuper-plugin plugins, on Kino's side (it outlives this short run). */
+/**
+ * The scheduled jobs. `update`: one pass over the person's xuper-plugin plugins, on Kino's side (it outlives this short run).
+ * `episodes`: the new-episode notices (src/newEpisodes.js; it skips itself below apiVersion 35).
+ */
 export async function job(ctx) {
   await null;
+  if (ctx && ctx.id === "episodes") return runNewEpisodes(ctx);
   if (!ctx || ctx.id !== "update") return null;
   const kino = globalThis.kino;
   if (!kino || typeof kino.manage !== "object") return null;

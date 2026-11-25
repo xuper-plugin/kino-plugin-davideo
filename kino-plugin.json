@@ -1,7 +1,7 @@
 {
   "id": "davideo",
   "name": "Da-Video",
-  "version": "0.4.16",
+  "version": "0.5.0",
   "apiVersion": 31,
   "entry": "plugin.js",
   "icon": "icon.png",
@@ -14,7 +14,9 @@
   "capabilities": [
     "screen",
     "schedule",
-    "manage"
+    "manage",
+    "library",
+    "notifications"
   ],
   "screen": {
     "label": "Da-Video",
@@ -43,6 +45,19 @@
         300,
         360
       ]
+    },
+    {
+      "id": "episodes",
+      "label": {
+        "es": "Avisarme de capítulos nuevos",
+        "en": "Tell me about new episodes"
+      },
+      "everyMin": 360,
+      "everyOptions": [
+        180,
+        360,
+        720
+      ]
     }
   ],
   "recommends": [
@@ -56,12 +71,13 @@
       "author": "xuper-plugin",
       "door": "catalog",
       "calls": [
-        "search"
+        "search",
+        "episodes"
       ]
     }
   },
   "signature": {
     "authorKey": "6693946bd5c56196960959c4b9665fad5094374bcb85ddb282f8bf762c835263",
-    "value": "41c438b080c8df2d4dd149e45b6bef034eebdc015ada19e7ad4bf9df6ebc0f94d762ad0d246cfd6b9eb110b3183506e6e8e5c2ad54e065de0518375cd1172204"
+    "value": "adde6cb978b7046e178290d0cfa0735ab60e0ada4cb7a43882ea16ecf36973641fcc50075c8a830a47adbae4a99888fa0c73466c0cfde8f2a1cb2dc80e265203"
   }
 }

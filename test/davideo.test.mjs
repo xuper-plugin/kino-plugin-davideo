@@ -365,3 +365,54 @@ test("catalog.json drives the page and the search: fetched on open, its order an
   assert.equal(cat.catalogSource, "fetched");
   cat.resetCatalog();
 });
+
+// New-episode notices (Kino 0.9.94, apiVersion 35): the job, the manifest, the page's switch.
+import { readFileSync } from "node:fs";
+
+test("the episodes job runs runNewEpisodes", async () => {
+  // Below 35 runNewEpisodes answers kino_too_old: the job hands that answer back, it never runs the update pass.
+  const kino = { ...fakeKino(), pluginApiVersion: 31 };
+  const p = await load(kino);
+  assert.deepEqual(await p.job({ id: "episodes", reason: "scheduled" }), { skipped: "kino_too_old" });
+  assert.deepEqual(kino.calls.filter((c) => c[0] === "updateAll"), []);
+  // On 35 with no library it reaches the next check: proof it is runNewEpisodes deciding.
+  const k35 = { ...fakeKino(), pluginApiVersion: 35 };
+  const p35 = await load(k35);
+  assert.deepEqual(await p35.job({ id: "episodes", reason: "scheduled" }), { skipped: "library_denied" });
+  assert.equal(await p35.job({ id: "nope" }), null);
+});
+
+test("the manifest declares library, notifications, the episodes job and the door's episodes call", () => {
+  const m = JSON.parse(readFileSync(new URL("../kino-plugin.json", import.meta.url), "utf8"));
+  assert.equal(m.apiVersion, 31);
+  for (const c of ["screen", "schedule", "manage", "library", "notifications"]) assert.ok(m.capabilities.includes(c), c);
+  assert.deepEqual(m.consumes.mine.calls, ["search", "episodes"]);
+  assert.deepEqual(m.jobs.find((j) => j.id === "episodes"), {
+    id: "episodes", label: { es: "Avisarme de capítulos nuevos", en: "Tell me about new episodes" }, everyMin: 360, everyOptions: [180, 360, 720],
+  });
+  assert.ok(m.jobs.find((j) => j.id === "update"), "the update job stays");
+});
+
+test("the page offers the switch only on Kino 35+", async () => {
+  const draw = async (over) => {
+    const kino = { ...fakeKino(), ...over };
+    const p = await load(kino);
+    const o = await p.screenEvent({ name: "open", state: {}, device: "phone", route: { name: "main" } });
+    o.state.dvTab = "mine";
+    return { p, o, tree: await p.screen({ state: o.state, device: "phone", installed: {} }) };
+  };
+  const old = await draw({ pluginApiVersion: 31 });
+  assert.ok(!byKey(old.tree, "episodesCard"), "no switch below 35");
+  const off = await draw({ pluginApiVersion: 35, jobOn: (id) => id === "update" });
+  assert.equal(byKey(off.tree, "episodesTitle").text, "Avísame de capítulos nuevos");
+  assert.equal(byKey(off.tree, "episodesTitle").textEn, "Tell me about new episodes");
+  assert.equal(byKey(off.tree, "episodesHint").text, "Te aviso cuando sale un capítulo nuevo de una serie que ves y ya está en uno de tus plugins.");
+  assert.equal(byKey(off.tree, "episodesHint").textEn, "I'll tell you when a new episode of a series you watch is out and already on one of your plugins.");
+  assert.deepEqual(byKey(off.tree, "enableEpisodes").onPressed, { event: "enableEpisodes" });
+  assert.deepEqual(await off.p.screenEvent({ name: "enableEpisodes", state: off.o.state }), { enableJob: "episodes", state: { episodesOn: true } });
+  const on = await draw({ pluginApiVersion: 35, jobOn: () => true });
+  assert.ok(byKey(on.tree, "episodesCard") && !byKey(on.tree, "enableEpisodes"), "on: the line stays, no button");
+  for (const lang of ["es", "en"]) for (const t of [off.tree, on.tree]) {
+    assert.deepEqual(kit.checkScreenTree(fold(t), lang, undefined, { apiVersion: 31 }).dropped, [], lang);
+  }
+});
